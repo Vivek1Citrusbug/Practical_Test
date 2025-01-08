@@ -1,10 +1,7 @@
 import jwt
-from datetime import datetime, timedelta, timezone
-from fastapi import Depends, FastAPI, HTTPException, status, responses
-from sqlmodel import SQLModel,select
+from sqlmodel import SQLModel, select
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from database import engine, SessionDep
 from apps.user.application.schemas import TokenData
 from apps.user.domain.models import Users
 from config import ACCESS_TOKEN_EXPIRE_MINUTES, ALGORITHM, SECRET_KEY
@@ -12,63 +9,19 @@ from typing import Annotated, Union
 from jwt.exceptions import InvalidTokenError
 from datetime import UTC
 
-oauth2_schema = OAuth2PasswordBearer(tokenUrl="/auth/token")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-async def create_db_and_tables():
+def verify_password(plain_password, hashed_password):
     """
-    Creating database tables
+    Function o verify password if user
     """
-
-    print("#### Database Created ####")
-    SQLModel.metadata.create_all(engine)
+    return pwd_context.verify(plain_password, hashed_password)
 
 
-async def get_current_user(
-    token: Annotated[str, Depends(oauth2_schema)], session: SessionDep
-):
+def get_password_hash(password):
     """
-    Function to get current logged in user
+    Function to geet password hashing
     """
 
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = TokenData(username=username)
-    except InvalidTokenError:
-        raise credentials_exception
-    user = get_user(session, username=token_data.username)
-    if user is None:
-        raise credentials_exception
-    return user
-
-
-def get_user(session: SessionDep, username: str):
-    """
-    Function to get user from given username
-    """
-    
-    statement = select(Users).where(Users.username == username)
-    user = session.exec(statement).first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    
-    return user
-
-
-async def get_current_active_user(
-    current_user: Annotated[Users, Depends(get_current_user)],
-):
-    """
-    Function to get current active user
-    """
-
-    return current_user
+    return pwd_context.hash(password)

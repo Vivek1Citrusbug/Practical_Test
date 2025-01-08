@@ -1,6 +1,6 @@
 from fastapi import FastAPI,HTTPException
 from contextlib import asynccontextmanager
-from apps.user.dependency import create_db_and_tables
+from apps.user.domain.service import create_db_and_tables
 from apps.user.interface import user_router as auth_router
 from apps.user.middleware import ErrorMiddleware,http_exception_handler
 

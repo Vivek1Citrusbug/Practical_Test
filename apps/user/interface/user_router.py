@@ -33,12 +33,14 @@ from apps.user.application.schemas import (
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from database import engine, SessionDep
 from jwt.exceptions import InvalidTokenError
-from apps.user.dependency import get_current_active_user, get_current_user
+from apps.user.dependency import get_password_hash
 from apps.user.domain.service import (
     create_access_token,
-    get_password_hash,
     verify_password,
     authenticate_user,
+    get_user,
+    get_current_user,
+    get_current_active_user,
 )
 from database import Session
 from requests_oauthlib import OAuth2Session
@@ -100,7 +102,7 @@ def github_login():
     return {"auth_url": github_auth_url}
 
 
-@router.get("/auth/github/callback")
+@router.get("/github/callback")
 async def github_callback(code: str):
     token_url = GITHUB_TOKEN_URL
     headers = {"Accept": "application/json"}
@@ -131,6 +133,7 @@ async def github_callback(code: str):
         {"username": user_data["login"], "sub": user_data["id"]}
     )
     return {"jwt_token": jwt_token, "user": user_data}
+
 
 @router.get("/users/me", response_model=UserPublicModel)
 def read_logged_in_user(current_user: UserPublicModel = Depends(get_current_user)):

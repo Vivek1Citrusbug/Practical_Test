@@ -2,30 +2,29 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 from passlib.context import CryptContext
 from config import ALGORITHM, SECRET_KEY
-from apps.user.dependency import get_current_active_user, get_user
+from apps.user.dependency import verify_password
 import jwt
 from database import SessionDep
 from fastapi import Depends
 from typing import Annotated
 from database import Session
 from apps.user.domain.models import Users
+from sqlmodel import SQLModel, select
+from database import engine
+from apps.user.application.schemas import TokenData
+from fastapi.security import OAuth2PasswordBearer
+from jwt.exceptions import InvalidTokenError
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_schema = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 
-def verify_password(plain_password, hashed_password):
+async def create_db_and_tables():
     """
-    Function o verify password if user
-    """
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_password_hash(password):
-    """
-    Function to geet password hashing
+    Creating database tables
     """
 
-    return pwd_context.hash(password)
+    print("#### Database Created ####")
+    SQLModel.metadata.create_all(engine)
 
 
 def authenticate_user(session, username: str, password: str):
@@ -55,7 +54,8 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def save_user_to_db(user_data):
+
+async def save_user_to_db(user_data):
     """
     Function to save user data to github user database
     """
@@ -68,7 +68,7 @@ def save_user_to_db(user_data):
         user = Users(
             username=user_data["login"],
             email=user_data.get("email"),
-            name=user_data["name"]
+            name=user_data["name"],
         )
         session.add(user)
         session.commit()
@@ -76,4 +76,53 @@ def save_user_to_db(user_data):
     session.close()
 
 
+def get_user(session: SessionDep, username: str):
+    """
+    Function to get user from given username
+    """
 
+    statement = select(Users).where(Users.username == username)
+    user = session.exec(statement).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    return user
+
+
+async def get_current_user(
+    token: Annotated[str, Depends(oauth2_schema)], session: SessionDep
+):
+    """
+    Function to get current logged in user
+    """
+
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except InvalidTokenError:
+        raise credentials_exception
+
+    user = get_user(session, username=token_data.username)
+    if user is None:
+        raise credentials_exception
+    return user
+
+
+async def get_current_active_user(
+    current_user: Annotated[Users, Depends(get_current_user)],
+):
+    """
+    Function to get current active user
+    """
+
+    return current_user
