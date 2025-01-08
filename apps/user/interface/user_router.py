@@ -90,27 +90,6 @@ async def login_for_access_token(
     return Token(access_token=access_token, token_type="bearer")
 
 
-def save_user_to_db(user_data):
-    """
-    Function to save user data to github user database
-    """
-
-    session = Session()
-    existing_user = session.query(Users).filter_by(email=user_data["email"]).first()
-    if existing_user:
-        print(f"User with email:{user_data['email']} already exists in the database.")
-    else:
-        user = Users(
-            username=user_data["login"],
-            email=user_data.get("email"),
-            name=user_data["name"]
-        )
-        session.add(user)
-        session.commit()
-        print(f"User {user_data['login']} saved to the database.")
-    session.close()
-
-
 @router.get("/github/login")
 def github_login():
     github_auth_url = (
@@ -123,7 +102,6 @@ def github_login():
 
 @router.get("/auth/github/callback")
 async def github_callback(code: str):
-    # Exchange code for access token
     token_url = GITHUB_TOKEN_URL
     headers = {"Accept": "application/json"}
     payload = {
@@ -148,9 +126,12 @@ async def github_callback(code: str):
     async with httpx.AsyncClient() as client:
         user_response = await client.get(user_url, headers=headers)
         user_data = user_response.json()
-        save_user_to_db(user_data)
 
     jwt_token = create_access_token(
         {"username": user_data["login"], "sub": user_data["id"]}
     )
     return {"jwt_token": jwt_token, "user": user_data}
+
+@router.get("/users/me", response_model=UserPublicModel)
+def read_logged_in_user(current_user: UserPublicModel = Depends(get_current_user)):
+    return current_user
