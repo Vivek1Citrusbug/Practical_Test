@@ -41,10 +41,12 @@ from apps.user.domain.service import (
     get_user,
     get_current_user,
     get_current_active_user,
+    github_callback_instance,
 )
 from database import Session
 from requests_oauthlib import OAuth2Session
 from oauthlib.oauth2 import WebApplicationClient
+from apps.user.application.service import register_user, github_callback_application
 
 router = APIRouter()
 
@@ -55,15 +57,7 @@ async def register(user: UserCreateModel, session: SessionDep):
     """
     Function to create user based on the allowed roles
     """
-
-    hashed_password = get_password_hash(user.password)
-    user_data = user.model_dump()
-    user_data["password"] = hashed_password
-    UserDatabase = Users.model_validate(user_data)
-    session.add(UserDatabase)
-    session.commit()
-    session.refresh(UserDatabase)
-    return UserDatabase
+    return await register_user(user, session)
 
 
 @router.post(
@@ -104,35 +98,7 @@ def github_login():
 
 @router.get("/github/callback")
 async def github_callback(code: str):
-    token_url = GITHUB_TOKEN_URL
-    headers = {"Accept": "application/json"}
-    payload = {
-        "client_id": GITHUB_CLIENT_ID,
-        "client_secret": GITHUB_CLIENT_SECRET,
-        "code": code,
-    }
-
-    async with httpx.AsyncClient() as client:
-        token_response = await client.post(token_url, data=payload, headers=headers)
-        token_data = token_response.json()
-        if "access_token" not in token_data:
-            raise HTTPException(
-                status_code=400, detail="Failed to retrieve access token"
-            )
-
-        access_token = token_data["access_token"]
-
-    user_url = "https://api.github.com/user"
-    headers = {"Authorization": f"Bearer {access_token}"}
-
-    async with httpx.AsyncClient() as client:
-        user_response = await client.get(user_url, headers=headers)
-        user_data = user_response.json()
-
-    jwt_token = create_access_token(
-        {"username": user_data["login"], "sub": user_data["id"]}
-    )
-    return {"jwt_token": jwt_token, "user": user_data}
+    return await github_callback_application(code)
 
 
 @router.get("/users/me", response_model=UserPublicModel)

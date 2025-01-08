@@ -1,13 +1,21 @@
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
+import httpx
 from passlib.context import CryptContext
-from config import ALGORITHM, SECRET_KEY
-from apps.user.dependency import verify_password
+from config import (
+    ALGORITHM,
+    GITHUB_CLIENT_ID,
+    GITHUB_CLIENT_SECRET,
+    GITHUB_TOKEN_URL,
+    SECRET_KEY,
+)
+from apps.user.dependency import verify_password, get_password_hash
 import jwt
 from database import SessionDep
 from fastapi import Depends
 from typing import Annotated
 from database import Session
+from apps.user.application.schemas import UserCreateModel
 from apps.user.domain.models import Users
 from sqlmodel import SQLModel, select
 from database import engine
@@ -126,3 +134,55 @@ async def get_current_active_user(
     """
 
     return current_user
+
+
+async def register_user_instance(user_data: UserCreateModel, session: Session):
+    """
+    Domain layer service for registering user
+    """
+
+    hashed_password = get_password_hash(user_data.password)
+    user_data = user_data.model_dump()
+    user_data["password"] = hashed_password
+    UserDatabase = Users.model_validate(user_data)
+    session.add(UserDatabase)
+    session.commit()
+    session.refresh(UserDatabase)
+
+    return UserDatabase
+
+
+async def github_callback_instance(code: str):
+    """
+    Domain layer service for Github callback service
+    """
+
+    token_url = GITHUB_TOKEN_URL
+    headers = {"Accept": "application/json"}
+    payload = {
+        "client_id": GITHUB_CLIENT_ID,
+        "client_secret": GITHUB_CLIENT_SECRET,
+        "code": code,
+    }
+
+    async with httpx.AsyncClient() as client:
+        token_response = await client.post(token_url, data=payload, headers=headers)
+        token_data = token_response.json()
+        if "access_token" not in token_data:
+            raise HTTPException(
+                status_code=400, detail="Failed to retrieve access token"
+            )
+
+        access_token = token_data["access_token"]
+
+    user_url = "https://api.github.com/user"
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    async with httpx.AsyncClient() as client:
+        user_response = await client.get(user_url, headers=headers)
+        user_data = user_response.json()
+
+    jwt_token = create_access_token(
+        {"username": user_data["login"], "sub": user_data["id"]}
+    )
+    return {"jwt_token": jwt_token, "user": user_data}
