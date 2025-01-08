@@ -1,7 +1,7 @@
 import jwt
 from datetime import datetime, timedelta, timezone
 from fastapi import Depends, FastAPI, HTTPException, status, responses
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel,select
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from database import engine, SessionDep
@@ -55,10 +55,12 @@ def get_user(session: SessionDep, username: str):
     """
     Function to get user from given username
     """
-
-    user = session.get(Users, username)
+    
+    statement = select(Users).where(Users.username == username)
+    user = session.exec(statement).first()
     if not user:
-        return HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    
     return user
 
 
