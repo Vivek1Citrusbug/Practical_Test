@@ -1,27 +1,26 @@
-# import jwt
-# from datetime import datetime, timedelta, timezone
-# from fastapi import Depends, FastAPI, HTTPException, status, responses
-# from sqlmodel import SQLModel
-# from passlib.context import CryptContext
-# from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-# from database import engine, SessionDep
-# from apps.user.application.schemas import TokenData
-# from apps.user.domain.models import UserModel
-# from config import ACCESS_TOKEN_EXPIRE_MINUTES, ALGORITHM, SECRET_KEY
-# from typing import Annotated
-# from jwt.exceptions import InvalidTokenError
+import jwt
+from datetime import datetime, timedelta, timezone
+from fastapi import Depends, FastAPI, HTTPException, status, responses
+from sqlmodel import SQLModel
+from passlib.context import CryptContext
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from database import engine, SessionDep
+from apps.user.application.schemas import TokenData
+from config import ACCESS_TOKEN_EXPIRE_MINUTES, ALGORITHM, SECRET_KEY
+from typing import Annotated
+from jwt.exceptions import InvalidTokenError
 
 
-# oauth2_schema = OAuth2PasswordBearer(tokenUrl="/auth/token")
+oauth2_schema = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 
-# def create_db_and_tables():
-#     """
-#     Creating database tables
-#     """
+async def create_db_and_tables():
+    """
+    Creating database tables
+    """
 
-#     print("All database model created#######")
-#     SQLModel.metadata.create_all(engine)
+    print("#### Database Created ####")
+    SQLModel.metadata.create_all(engine)
 
 
 # async def get_current_user(
