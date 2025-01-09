@@ -110,33 +110,33 @@ async def github_callback(code: str, session: SessionDep):
 
 @router.post("/password-reset/")
 def password_reset_request(
-    data: PasswordResetRequest,
     session: SessionDep,
+    current_user: Users = Depends(get_current_user),
 ):
-    user: Users = session.query(Users).filter_by(email=data.email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    token = create_reset_token(user.email)
-    user.password_reset_token = token
-
-    session.add(user)
+    token = create_reset_token(current_user.email)
+    current_user.password_reset_token = token
+    reset_link = RESET_LINK + token
+    session.add(current_user)
     session.commit()
     reset_link = RESET_LINK + token
-    print(reset_link)
 
-    if mail_service(user.email, session):
+    if mail_service(current_user.email, reset_link, session):
         return {"message": "Password reset email sent"}
     else:
         raise HTTPException(status_code=500, detail="Error sending email")
 
 
 @router.post("/password-reset/confirm/")
-def password_reset_confirm(email: str, new_password: str, session: SessionDep):
-    user: Users = session.query(Users).filter_by(email=email).first()
-    email = verify_reset_token(user.password_reset_token)
+def password_reset_confirm(
+    new_password: str,
+    session: SessionDep,
+    current_user: Users = Depends(get_current_user),
+):
+    email = verify_reset_token(current_user.password_reset_token)
     if email is None:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    user.password = get_password_hash(new_password)  # Replace with hashed password
+    current_user.password = get_password_hash(new_password)  
+    session.add(current_user)
+    session.commit()
     return {"message": "Password has been reset successfully"}

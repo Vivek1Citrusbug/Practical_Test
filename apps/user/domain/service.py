@@ -205,11 +205,10 @@ async def github_callback_instance(code: str, session: SessionDep):
     return {"jwt_token": jwt_token, "user": user_data}
 
 
-def mail_service(to_email: str, session: SessionDep):
+def mail_service(to_email: str,reset_link:str ,session: SessionDep):
     """
     Service for sending email using sendgrid api client.
     """
-    # Fetch username from database
     user:Users = session.query(Users).filter_by(email=to_email).first()
     message = Mail(
         from_email=FROM_EMAIL,
@@ -217,15 +216,15 @@ def mail_service(to_email: str, session: SessionDep):
     )
     message.dynamic_template_data = {
         "username": user.username,
+        "reset_link":reset_link
     }
     message.template_id = SENDGRID_TEMPLATE_ID
+    sg = SendGridAPIClient(SENDGRID_API_KEY)
     try:
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
-        try:
-            response = sg.send(message)
-            print("Email sent successfully!")
-            print(f"Response status code: {response.status_code}")
-        except Exception as e:
-            print(f"Error sending email: {e}")
+        response = sg.send(message)
+        print("Email sent successfully!")
+        print(f"Response status code: {response.status_code}")
+        return 1
     except Exception as e:
-        print(e)
+        print(f"Error sending email: {e}")
+    
