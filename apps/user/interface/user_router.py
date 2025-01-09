@@ -36,7 +36,6 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from database import engine, SessionDep
 from jwt.exceptions import InvalidTokenError
 from apps.user.dependency import (
-    create_reset_token,
     verify_reset_token,
     get_password_hash,
 )
@@ -53,7 +52,12 @@ from apps.user.domain.service import (
 from database import Session
 from requests_oauthlib import OAuth2Session
 from oauthlib.oauth2 import WebApplicationClient
-from apps.user.application.service import register_user, github_callback_application
+from apps.user.application.service import (
+    register_user,
+    github_callback_application,
+    password_reset_application,
+    password_reset_confirm_application
+)
 
 router = APIRouter()
 
@@ -109,34 +113,18 @@ async def github_callback(code: str, session: SessionDep):
 
 
 @router.post("/password-reset/")
-def password_reset_request(
+async def password_reset_request(
     session: SessionDep,
     current_user: Users = Depends(get_current_user),
 ):
-    token = create_reset_token(current_user.email)
-    current_user.password_reset_token = token
-    reset_link = RESET_LINK + token
-    session.add(current_user)
-    session.commit()
-    reset_link = RESET_LINK + token
-
-    if mail_service(current_user.email, reset_link, session):
-        return {"message": "Password reset email sent"}
-    else:
-        raise HTTPException(status_code=500, detail="Error sending email")
+    return await password_reset_application(session, current_user)
 
 
 @router.post("/password-reset/confirm/")
-def password_reset_confirm(
+async def password_reset_confirm(
     new_password: str,
     session: SessionDep,
     current_user: Users = Depends(get_current_user),
 ):
-    email = verify_reset_token(current_user.password_reset_token)
-    if email is None:
-        raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    current_user.password = get_password_hash(new_password)  
-    session.add(current_user)
-    session.commit()
-    return {"message": "Password has been reset successfully"}
+    return await password_reset_confirm_application(new_password, session, current_user)

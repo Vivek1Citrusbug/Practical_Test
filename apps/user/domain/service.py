@@ -13,8 +13,9 @@ from config import (
     FROM_EMAIL,
     EMAIL_HOST_PASSWORD,
     SENDGRID_TEMPLATE_ID,
+    RESET_LINK,
 )
-from apps.user.dependency import verify_password, get_password_hash
+from apps.user.dependency import verify_password, get_password_hash, create_reset_token,verify_reset_token
 import jwt
 from database import SessionDep
 from fastapi import Depends
@@ -205,18 +206,18 @@ async def github_callback_instance(code: str, session: SessionDep):
     return {"jwt_token": jwt_token, "user": user_data}
 
 
-def mail_service(to_email: str,reset_link:str ,session: SessionDep):
+def mail_service(to_email: str, reset_link: str, session: SessionDep):
     """
     Service for sending email using sendgrid api client.
     """
-    user:Users = session.query(Users).filter_by(email=to_email).first()
+    user: Users = session.query(Users).filter_by(email=to_email).first()
     message = Mail(
         from_email=FROM_EMAIL,
         to_emails=to_email,
     )
     message.dynamic_template_data = {
         "username": user.username,
-        "reset_link":reset_link
+        "reset_link": reset_link,
     }
     message.template_id = SENDGRID_TEMPLATE_ID
     sg = SendGridAPIClient(SENDGRID_API_KEY)
@@ -227,4 +228,35 @@ def mail_service(to_email: str,reset_link:str ,session: SessionDep):
         return 1
     except Exception as e:
         print(f"Error sending email: {e}")
-    
+
+
+async def password_reset_instance(session: SessionDep, current_user: Users):
+    """
+    Service for Creating reset password token
+    """
+
+    token = create_reset_token(current_user.email)
+    current_user.password_reset_token = token
+    reset_link = RESET_LINK + token
+    session.add(current_user)
+    session.commit()
+    reset_link = RESET_LINK + token
+
+    if mail_service(current_user.email, reset_link, session):
+        return {"message": "Password reset email sent"}
+    else:
+        raise HTTPException(status_code=500, detail="Error sending email")
+
+async def password_reset_confirm_instance(new_password:str,session: SessionDep, current_user: Users):
+    """
+    Service for Creating reset password token
+    """
+
+    email = verify_reset_token(current_user.password_reset_token)
+    if email is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    current_user.password = get_password_hash(new_password)
+    session.add(current_user)
+    session.commit()
+    return {"message": "Password has been reset successfully"}
