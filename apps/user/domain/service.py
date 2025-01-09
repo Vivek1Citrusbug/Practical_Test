@@ -15,14 +15,19 @@ from config import (
     SENDGRID_TEMPLATE_ID,
     RESET_LINK,
 )
-from apps.user.dependency import verify_password, get_password_hash, create_reset_token,verify_reset_token
+from apps.user.dependency import (
+    verify_password,
+    get_password_hash,
+    create_reset_token,
+    verify_reset_token,
+)
 import jwt
 from database import SessionDep
 from fastapi import Depends
 from typing import Annotated
 from database import Session
-from apps.user.application.schemas import UserCreateModel
-from apps.user.domain.models import Users
+from apps.user.application.schemas import UserCreateModel,UserProfileCreate
+from apps.user.domain.models import Users, Profile
 from sqlmodel import SQLModel, select
 from database import engine
 from apps.user.application.schemas import TokenData
@@ -247,7 +252,10 @@ async def password_reset_instance(session: SessionDep, current_user: Users):
     else:
         raise HTTPException(status_code=500, detail="Error sending email")
 
-async def password_reset_confirm_instance(new_password:str,session: SessionDep, current_user: Users):
+
+async def password_reset_confirm_instance(
+    new_password: str, session: SessionDep, current_user: Users
+):
     """
     Service for Creating reset password token
     """
@@ -260,3 +268,57 @@ async def password_reset_confirm_instance(new_password:str,session: SessionDep, 
     session.add(current_user)
     session.commit()
     return {"message": "Password has been reset successfully"}
+
+
+async def user_profile_delete_instance(
+    username: str, session: SessionDep, current_user: Users
+):
+    """
+    Service for deleting user profile
+    """
+
+    profile = session.exec(select(Profile).where(Profile.username == username)).first()
+
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    if (
+        current_user.username == username
+        or current_user.is_staff
+        or current_user.is_superuser
+    ):  # only admin or one who owns the profile will be able to delete profile
+        session.delete(profile)
+        session.commit()
+        return {"detail": "Profile deleted successfully"}
+    
+
+async def user_profile_update_instance(
+    profile_data: UserProfileCreate, session: SessionDep, current_user: Users
+):
+    """
+    Service for updating user profile
+    """
+
+    profile = session.exec(
+        select(Profile).where(Profile.username == current_user.username)
+    ).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    profile.bio = profile_data.bio if profile_data.bio is not None else profile.bio
+    profile.profile_picture = (
+        profile_data.profile_picture
+        if profile_data.profile_picture is not None
+        else profile.profile_picture
+    )
+    profile.is_private_account = (
+        profile_data.is_private_account
+        if profile_data.is_private_account is not None
+        else profile.is_private_account
+    )
+    profile.modified_at = datetime.now(timezone.utc)
+
+    session.add(profile)
+    session.commit()
+    session.refresh(profile)
+    return profile

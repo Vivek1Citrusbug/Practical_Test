@@ -31,6 +31,8 @@ from apps.user.application.service import (
     github_callback_application,
     password_reset_application,
     password_reset_confirm_application,
+    user_profile_delete_application,
+    user_profile_update_application
 )
 
 router = APIRouter()
@@ -140,53 +142,19 @@ def get_profile(username: str, session: SessionDep):
 
 
 @router.put("/profiles/{username}", response_model=UserProfilePublic,tags=["Profile"])
-def update_profile(
+async def update_profile(
     profile_data: UserProfileCreate,
     session: SessionDep,
     current_user: Users = Depends(get_current_user),
 ):
-    profile = session.exec(
-        select(Profile).where(Profile.username == current_user.username)
-    ).first()
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
-
-    profile.bio = profile_data.bio if profile_data.bio is not None else profile.bio
-    profile.profile_picture = (
-        profile_data.profile_picture
-        if profile_data.profile_picture is not None
-        else profile.profile_picture
-    )
-    profile.is_private_account = (
-        profile_data.is_private_account
-        if profile_data.is_private_account is not None
-        else profile.is_private_account
-    )
-    profile.modified_at = datetime.now(timezone.utc)
-
-    session.add(profile)
-    session.commit()
-    session.refresh(profile)
-    return profile
+    return await user_profile_update_application(profile_data,session,current_user)
 
 
 @router.delete("/profiles/{username}",tags=["Profile"])
-def delete_profile(
+async def delete_profile(
     username: str,
     session: SessionDep,
     current_user: Users = Depends(get_current_user),
 ):
 
-    profile = session.exec(select(Profile).where(Profile.username == username)).first()
-
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
-
-    if (
-        current_user.username == username
-        or current_user.is_staff
-        or current_user.is_superuser
-    ):  # only admin or one who owns the profile will be able to delete profile
-        session.delete(profile)
-        session.commit()
-        return {"detail": "Profile deleted successfully"}
+    return await user_profile_delete_application(username,session,current_user)

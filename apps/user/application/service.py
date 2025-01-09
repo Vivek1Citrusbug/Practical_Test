@@ -1,11 +1,13 @@
 from database import Session
-from apps.user.application.schemas import UserCreateModel
+from apps.user.application.schemas import UserCreateModel,UserProfileCreate
 from apps.user.domain.models import Users
 from apps.user.domain.service import (
     register_user_instance,
     github_callback_instance,
     password_reset_instance,
-    password_reset_confirm_instance
+    password_reset_confirm_instance,
+    user_profile_delete_instance,
+    user_profile_update_instance
 )
 from database import SessionDep
 
@@ -41,3 +43,17 @@ async def password_reset_confirm_application(new_password:str,session: SessionDe
 
     return await password_reset_confirm_instance(new_password,session, current_user)
 
+
+async def user_profile_delete_application(username: str, session: SessionDep, current_user: Users):
+    """
+    Application layer service for deleting user profile
+    """
+
+    return await user_profile_delete_instance(username ,session, current_user)
+
+async def user_profile_update_application(profile_data: UserProfileCreate, session: SessionDep, current_user: Users):
+    """
+    Application layer service for deleting user profile
+    """
+
+    return await user_profile_delete_instance(profile_data ,session, current_user)
