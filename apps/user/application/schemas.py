@@ -33,6 +33,17 @@ class UserCreateModel(SQLModel):
     password: str
 
 
+class AdminCreateModel(SQLModel):
+    username: str
+    name: str
+    first_name: str
+    last_name: str
+    email: str
+    password: str
+    is_staff:bool
+    is_superuser:bool
+
+
 class Token(SQLModel):
     access_token: str
     token_type: str

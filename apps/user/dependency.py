@@ -21,13 +21,17 @@ def verify_password(plain_password, hashed_password):
 
 def get_password_hash(password):
     """
-    Function to geet password hashing
+    Function to get password hashing
     """
 
     return pwd_context.hash(password)
 
 
 def create_reset_token(email: str):
+    """
+    Function to create password reset token
+    """
+     
     expire = datetime.now(UTC) + timedelta(hours=1)  # Token valid for 1 hour
     payload = {"sub": email, "exp": expire}
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -35,6 +39,10 @@ def create_reset_token(email: str):
 
 
 def verify_reset_token(token: str):
+    """
+    Function to verify password reset token
+    """
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email = payload.get("sub")
