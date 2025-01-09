@@ -53,7 +53,7 @@ async def user_profile_delete_application(username: str, session: SessionDep, cu
 
 async def user_profile_update_application(profile_data: UserProfileCreate, session: SessionDep, current_user: Users):
     """
-    Application layer service for deleting user profile
+    Application layer service for updating user profile
     """
 
     return await user_profile_delete_instance(profile_data ,session, current_user)
