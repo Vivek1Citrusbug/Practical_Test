@@ -26,7 +26,7 @@ from database import SessionDep
 from fastapi import Depends
 from typing import Annotated
 from database import Session
-from apps.user.application.schemas import UserCreateModel,UserProfileCreate
+from apps.user.application.schemas import UserCreateModel, UserProfileCreate
 from apps.user.domain.models import Users, Profile
 from sqlmodel import SQLModel, select
 from database import engine
@@ -290,7 +290,7 @@ async def user_profile_delete_instance(
         session.delete(profile)
         session.commit()
         return {"detail": "Profile deleted successfully"}
-    
+
 
 async def user_profile_update_instance(
     profile_data: UserProfileCreate, session: SessionDep, current_user: Users
@@ -321,4 +321,35 @@ async def user_profile_update_instance(
     session.add(profile)
     session.commit()
     session.refresh(profile)
+    return profile
+
+
+async def user_profile_create_instance(
+    profile: UserProfileCreate, session: SessionDep, current_user: Users
+):
+    if getattr(current_user, "is_admin", False):
+        raise HTTPException(status_code=403, detail="Admins cannot have profiles")
+
+    existing_profile = session.exec(
+        select(Profile).where(Profile.username == current_user.username)
+    ).first()
+    if existing_profile:
+        raise HTTPException(status_code=400, detail="User already has a profile")
+
+    new_profile = Profile(
+        bio=profile.bio,
+        profile_picture=profile.profile_picture,
+        is_private_account=profile.is_private_account,
+        username=current_user.username,
+    )
+    session.add(new_profile)
+    session.commit()
+    session.refresh(new_profile)
+    return new_profile
+
+
+async def user_profile_get_instance(username: str, session: SessionDep):
+    profile = session.exec(select(Profile).where(Profile.username == username)).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
     return profile
