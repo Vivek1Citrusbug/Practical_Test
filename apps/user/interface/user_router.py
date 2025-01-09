@@ -97,10 +97,54 @@ def github_login():
 
 
 @router.get("/github/callback")
-async def github_callback(code: str):
-    return await github_callback_application(code)
+async def github_callback(code: str,session:SessionDep):
+    return await github_callback_application(code,session)
+
+@router.post("/password-reset/")
+def password_reset_request(data: PasswordResetRequest):
+    email = data.email
+    if email not in users_db:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    token = create_reset_token(email)
+    reset_link = f"http://localhost:8000/password-reset/confirm?token={token}"
+    
+    email_content = f"""
+    <h1>Password Reset Request</h1>
+    <p>Click the link below to reset your password:</p>
+    <a href="{reset_link}">Reset Password</a>
+    """
+    
+    if send_email(email, "Password Reset", email_content):
+        return {"message": "Password reset email sent"}
+    else:
+        raise HTTPException(status_code=500, detail="Error sending email")
+
+@router.post("/password-reset/confirm/")
+def password_reset_confirm(data: PasswordResetConfirm):
+    email = verify_reset_token(data.token)
+    if email is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+    
+    # Update password in the database
+    users_db[email]["password"] = data.new_password  # Replace with hashed password
+    return {"message": "Password has been reset successfully"}
 
 
-@router.get("/users/me", response_model=UserPublicModel)
-def read_logged_in_user(current_user: UserPublicModel = Depends(get_current_user)):
-    return current_user
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# @router.get("/users/me", response_model=UserPublicModel)
+# def read_logged_in_user(current_user: UserPublicModel = Depends(get_current_user)):
+#     return current_user

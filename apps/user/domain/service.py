@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 import httpx
@@ -22,6 +23,9 @@ from database import engine
 from apps.user.application.schemas import TokenData
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+
 
 oauth2_schema = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
@@ -63,20 +67,25 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
-async def save_user_to_db(user_data):
+async def save_user_to_db(user_data,session:SessionDep):
     """
     Function to save user data to github user database
     """
 
-    session = Session()
-    existing_user = session.query(Users).filter_by(email=user_data["email"]).first()
+    existing_user = session.query(Users).filter_by(email=user_data.get("email")).first()
+    
     if existing_user:
         print(f"User with email:{user_data['email']} already exists in the database.")
     else:
+        name_list = user_data["name"].split()
+        print(name_list)
         user = Users(
             username=user_data["login"],
             email=user_data.get("email"),
             name=user_data["name"],
+            password="",
+            first_name=name_list[0],
+            last_name=name_list[1]
         )
         session.add(user)
         session.commit()
@@ -152,7 +161,7 @@ async def register_user_instance(user_data: UserCreateModel, session: Session):
     return UserDatabase
 
 
-async def github_callback_instance(code: str):
+async def github_callback_instance(code: str,session:SessionDep):
     """
     Domain layer service for Github callback service
     """
@@ -181,8 +190,29 @@ async def github_callback_instance(code: str):
     async with httpx.AsyncClient() as client:
         user_response = await client.get(user_url, headers=headers)
         user_data = user_response.json()
+        await save_user_to_db(user_data,session)
 
     jwt_token = create_access_token(
         {"username": user_data["login"], "sub": user_data["id"]}
     )
     return {"jwt_token": jwt_token, "user": user_data}
+
+
+
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+FROM_EMAIL = os.getenv("FROM_EMAIL")  # Replace with your email
+
+def send_email(to_email: str, subject: str, content: str):
+    message = Mail(
+        from_email=FROM_EMAIL,
+        to_emails=to_email,
+        subject=subject,
+        html_content=content,
+    )
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        sg.send(message)
+        return True
+    except Exception as e:
+        print(f"Error sending email: {e}")
+        return False

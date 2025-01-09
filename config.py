@@ -9,3 +9,6 @@ GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"
 GITHUB_API_URL = "https://api.github.com/user"
 GITHUB_REDIRECT_URI = "https://5784-182-70-122-97.ngrok-free.app" 
 GITHUB_CLIENT_ID = "Iv23lirqlvDErqbtVJKO"
+
+## SendGrid API key]
+SENDGRID_API_KEY="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"
