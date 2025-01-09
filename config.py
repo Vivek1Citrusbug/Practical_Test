@@ -11,4 +11,11 @@ GITHUB_REDIRECT_URI = "https://5784-182-70-122-97.ngrok-free.app"
 GITHUB_CLIENT_ID = "Iv23lirqlvDErqbtVJKO"
 
 ## SendGrid API key]
-SENDGRID_API_KEY="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"
+SENDGRID_API_KEY="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"
+FROM_EMAIL="vivek1.citrusbug@gmail.com"
+EMAIL_HOST = 'sandbox.smtp.mailtrap.io'
+EMAIL_HOST_USER = 'a5634ec7138a39'
+EMAIL_HOST_PASSWORD = '63bbdfc9cce507'
+EMAIL_PORT = '2525'
+SENDGRID_TEMPLATE_ID="d-e4ce59a775ca461f9973942d53282852"
+RESET_LINK="https://5784-182-70-122-97.ngrok-free.app/auth/password-reset/confirm?token="

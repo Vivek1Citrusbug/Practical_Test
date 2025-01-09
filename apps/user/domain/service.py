@@ -9,6 +9,10 @@ from config import (
     GITHUB_CLIENT_SECRET,
     GITHUB_TOKEN_URL,
     SECRET_KEY,
+    SENDGRID_API_KEY,
+    FROM_EMAIL,
+    EMAIL_HOST_PASSWORD,
+    SENDGRID_TEMPLATE_ID,
 )
 from apps.user.dependency import verify_password, get_password_hash
 import jwt
@@ -25,7 +29,10 @@ from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
+import ssl
 
+# Disable SSL verification (not recommended for production)
+ssl._create_default_https_context = ssl._create_unverified_context
 
 oauth2_schema = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
@@ -67,13 +74,13 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
-async def save_user_to_db(user_data,session:SessionDep):
+async def save_user_to_db(user_data, session: SessionDep):
     """
     Function to save user data to github user database
     """
 
     existing_user = session.query(Users).filter_by(email=user_data.get("email")).first()
-    
+
     if existing_user:
         print(f"User with email:{user_data['email']} already exists in the database.")
     else:
@@ -85,7 +92,7 @@ async def save_user_to_db(user_data,session:SessionDep):
             name=user_data["name"],
             password="",
             first_name=name_list[0],
-            last_name=name_list[1]
+            last_name=name_list[1],
         )
         session.add(user)
         session.commit()
@@ -161,7 +168,7 @@ async def register_user_instance(user_data: UserCreateModel, session: Session):
     return UserDatabase
 
 
-async def github_callback_instance(code: str,session:SessionDep):
+async def github_callback_instance(code: str, session: SessionDep):
     """
     Domain layer service for Github callback service
     """
@@ -190,7 +197,7 @@ async def github_callback_instance(code: str,session:SessionDep):
     async with httpx.AsyncClient() as client:
         user_response = await client.get(user_url, headers=headers)
         user_data = user_response.json()
-        await save_user_to_db(user_data,session)
+        await save_user_to_db(user_data, session)
 
     jwt_token = create_access_token(
         {"username": user_data["login"], "sub": user_data["id"]}
@@ -198,21 +205,27 @@ async def github_callback_instance(code: str,session:SessionDep):
     return {"jwt_token": jwt_token, "user": user_data}
 
 
-
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-FROM_EMAIL = os.getenv("FROM_EMAIL")  # Replace with your email
-
-def send_email(to_email: str, subject: str, content: str):
+def mail_service(to_email: str, session: SessionDep):
+    """
+    Service for sending email using sendgrid api client.
+    """
+    # Fetch username from database
+    user:Users = session.query(Users).filter_by(email=to_email).first()
     message = Mail(
         from_email=FROM_EMAIL,
         to_emails=to_email,
-        subject=subject,
-        html_content=content,
     )
+    message.dynamic_template_data = {
+        "username": user.username,
+    }
+    message.template_id = SENDGRID_TEMPLATE_ID
     try:
         sg = SendGridAPIClient(SENDGRID_API_KEY)
-        sg.send(message)
-        return True
+        try:
+            response = sg.send(message)
+            print("Email sent successfully!")
+            print(f"Response status code: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending email: {e}")
     except Exception as e:
-        print(f"Error sending email: {e}")
-        return False
+        print(e)

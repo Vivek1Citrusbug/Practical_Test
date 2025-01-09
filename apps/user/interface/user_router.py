@@ -11,6 +11,7 @@ from apps.user.application.schemas import (
     UserBaseModel,
     UserCreateModel,
     UserPublicModel,
+    PasswordResetRequest,
 )
 from fastapi import status
 from datetime import datetime, timedelta, timezone
@@ -24,6 +25,7 @@ from config import (
     GITHUB_CLIENT_SECRET,
     GITHUB_TOKEN_URL,
     GITHUB_API_URL,
+    RESET_LINK,
 )
 from apps.user.application.schemas import (
     UserBaseModel,
@@ -33,7 +35,11 @@ from apps.user.application.schemas import (
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from database import engine, SessionDep
 from jwt.exceptions import InvalidTokenError
-from apps.user.dependency import get_password_hash
+from apps.user.dependency import (
+    create_reset_token,
+    verify_reset_token,
+    get_password_hash,
+)
 from apps.user.domain.service import (
     create_access_token,
     verify_password,
@@ -42,6 +48,7 @@ from apps.user.domain.service import (
     get_current_user,
     get_current_active_user,
     github_callback_instance,
+    mail_service,
 )
 from database import Session
 from requests_oauthlib import OAuth2Session
@@ -97,54 +104,39 @@ def github_login():
 
 
 @router.get("/github/callback")
-async def github_callback(code: str,session:SessionDep):
-    return await github_callback_application(code,session)
+async def github_callback(code: str, session: SessionDep):
+    return await github_callback_application(code, session)
+
 
 @router.post("/password-reset/")
-def password_reset_request(data: PasswordResetRequest):
-    email = data.email
-    if email not in users_db:
+def password_reset_request(
+    data: PasswordResetRequest,
+    session: SessionDep,
+):
+    user: Users = session.query(Users).filter_by(email=data.email).first()
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    token = create_reset_token(email)
-    reset_link = f"http://localhost:8000/password-reset/confirm?token={token}"
-    
-    email_content = f"""
-    <h1>Password Reset Request</h1>
-    <p>Click the link below to reset your password:</p>
-    <a href="{reset_link}">Reset Password</a>
-    """
-    
-    if send_email(email, "Password Reset", email_content):
+
+    token = create_reset_token(user.email)
+    user.password_reset_token = token
+
+    session.add(user)
+    session.commit()
+    reset_link = RESET_LINK + token
+    print(reset_link)
+
+    if mail_service(user.email, session):
         return {"message": "Password reset email sent"}
     else:
         raise HTTPException(status_code=500, detail="Error sending email")
 
+
 @router.post("/password-reset/confirm/")
-def password_reset_confirm(data: PasswordResetConfirm):
-    email = verify_reset_token(data.token)
+def password_reset_confirm(email: str, new_password: str, session: SessionDep):
+    user: Users = session.query(Users).filter_by(email=email).first()
+    email = verify_reset_token(user.password_reset_token)
     if email is None:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
-    
-    # Update password in the database
-    users_db[email]["password"] = data.new_password  # Replace with hashed password
+
+    user.password = get_password_hash(new_password)  # Replace with hashed password
     return {"message": "Password has been reset successfully"}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# @router.get("/users/me", response_model=UserPublicModel)
-# def read_logged_in_user(current_user: UserPublicModel = Depends(get_current_user)):
-#     return current_user
