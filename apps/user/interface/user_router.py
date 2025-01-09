@@ -5,10 +5,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, requests
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import SQLModel, select
-from apps.user.domain.models import Users
+from apps.user.domain.models import Users, Profile
 from apps.user.application.schemas import (
     Token,
-    UserBaseModel,
     UserCreateModel,
     UserPublicModel,
 )
@@ -16,43 +15,30 @@ from fastapi import status
 from datetime import datetime, timedelta, timezone
 from config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
-    ALGORITHM,
-    SECRET_KEY,
-    GITHUB_AUTHORIZATION_BASE_URL,
-    GITHUB_REDIRECT_URI,
     GITHUB_CLIENT_ID,
-    GITHUB_CLIENT_SECRET,
-    GITHUB_TOKEN_URL,
-    GITHUB_API_URL,
 )
-from apps.user.application.schemas import (
-    UserBaseModel,
-    Token,
-    TokenData,
-)
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from apps.user.application.schemas import Token, UserProfileCreate, UserProfilePublic
+from fastapi.security import OAuth2PasswordRequestForm
 from database import engine, SessionDep
-from jwt.exceptions import InvalidTokenError
-from apps.user.dependency import get_password_hash
 from apps.user.domain.service import (
     create_access_token,
-    verify_password,
     authenticate_user,
-    get_user,
     get_current_user,
-    get_current_active_user,
-    github_callback_instance,
 )
 from database import Session
-from requests_oauthlib import OAuth2Session
-from oauthlib.oauth2 import WebApplicationClient
-from apps.user.application.service import register_user, github_callback_application
+from apps.user.application.service import (
+    register_user,
+    github_callback_application,
+    password_reset_application,
+    password_reset_confirm_application,
+    user_profile_delete_application,
+    user_profile_update_application
+)
 
 router = APIRouter()
 
 
-# User registration endpoint
-@router.post("/register", response_model=UserPublicModel)
+@router.post("/register", response_model=UserPublicModel,tags=["Users"])
 async def register(user: UserCreateModel, session: SessionDep):
     """
     Function to create user based on the allowed roles
@@ -62,7 +48,7 @@ async def register(user: UserCreateModel, session: SessionDep):
 
 @router.post(
     "/token",
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_201_CREATED,tags=["Users"]
 )
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()], session: SessionDep
@@ -86,7 +72,7 @@ async def login_for_access_token(
     return Token(access_token=access_token, token_type="bearer")
 
 
-@router.get("/github/login")
+@router.get("/github/login",tags=["Users"])
 def github_login():
     github_auth_url = (
         f"https://github.com/login/oauth/authorize"
@@ -96,11 +82,79 @@ def github_login():
     return {"auth_url": github_auth_url}
 
 
-@router.get("/github/callback")
-async def github_callback(code: str):
-    return await github_callback_application(code)
+@router.get("/github/callback",tags=["Users"])
+async def github_callback(code: str, session: SessionDep):
+    return await github_callback_application(code, session)
 
 
-@router.get("/users/me", response_model=UserPublicModel)
-def read_logged_in_user(current_user: UserPublicModel = Depends(get_current_user)):
-    return current_user
+@router.post("/password-reset/",tags=["Users"])
+async def password_reset_request(
+    session: SessionDep,
+    current_user: Users = Depends(get_current_user),
+):
+    return await password_reset_application(session, current_user)
+
+
+@router.post("/password-reset/confirm/",tags=["Users"])
+async def password_reset_confirm(
+    new_password: str,
+    session: SessionDep,
+    current_user: Users = Depends(get_current_user),
+):
+
+    return await password_reset_confirm_application(new_password, session, current_user)
+
+
+@router.post("/profiles/", response_model=Profile,tags=["Profile"])
+def create_profile(
+    profile: UserProfileCreate,
+    session: SessionDep,
+    current_user: Users = Depends(get_current_user),
+):
+
+    if getattr(current_user, "is_admin", False):
+        raise HTTPException(status_code=403, detail="Admins cannot have profiles")
+
+    existing_profile = session.exec(
+        select(Profile).where(Profile.username == current_user.username)
+    ).first()
+    if existing_profile:
+        raise HTTPException(status_code=400, detail="User already has a profile")
+
+    new_profile = Profile(
+        bio=profile.bio,
+        profile_picture=profile.profile_picture,
+        is_private_account=profile.is_private_account,
+        username=current_user.username,
+    )
+    session.add(new_profile)
+    session.commit()
+    session.refresh(new_profile)
+    return new_profile
+
+
+@router.get("/profiles/{username}", response_model=UserProfilePublic,tags=["Profile"])
+def get_profile(username: str, session: SessionDep):
+    profile = session.exec(select(Profile).where(Profile.username == username)).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return profile
+
+
+@router.put("/profiles/{username}", response_model=UserProfilePublic,tags=["Profile"])
+async def update_profile(
+    profile_data: UserProfileCreate,
+    session: SessionDep,
+    current_user: Users = Depends(get_current_user),
+):
+    return await user_profile_update_application(profile_data,session,current_user)
+
+
+@router.delete("/profiles/{username}",tags=["Profile"])
+async def delete_profile(
+    username: str,
+    session: SessionDep,
+    current_user: Users = Depends(get_current_user),
+):
+
+    return await user_profile_delete_application(username,session,current_user)

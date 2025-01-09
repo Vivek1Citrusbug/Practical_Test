@@ -1,4 +1,5 @@
 from sqlmodel import SQLModel, Field
+from pydantic import BaseModel, EmailStr
 
 
 #############################
@@ -7,7 +8,7 @@ from sqlmodel import SQLModel, Field
 
 
 class UserBaseModel(SQLModel):
-    username: str
+    username: str = Field(unique=True)
     name: str | None = Field(default=None)
     first_name: str | None = Field(default=None)
     last_name: str | None = Field(default=None)
@@ -25,11 +26,24 @@ class UserPublicModel(SQLModel):
 
 class UserCreateModel(SQLModel):
     username: str
-    name:str
-    first_name:str
-    last_name:str
+    name: str
+    first_name: str
+    last_name: str
     email: str
     password: str
+
+
+class UserProfileCreate(SQLModel):
+    bio: str | None = Field(default=None)
+    profile_picture: str | None = Field(default=None)
+    is_private_account: bool
+
+
+class UserProfilePublic(SQLModel):
+    bio: str | None = Field(default=None)
+    profile_picture: str | None = Field(default=None)
+    is_private_account: bool
+    created_at: str
 
 
 class Token(SQLModel):
@@ -40,3 +54,7 @@ class Token(SQLModel):
 class TokenData(SQLModel):
     username: str
     email: str | None = None
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr

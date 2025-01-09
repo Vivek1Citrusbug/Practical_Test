@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 import httpx
@@ -8,20 +9,36 @@ from config import (
     GITHUB_CLIENT_SECRET,
     GITHUB_TOKEN_URL,
     SECRET_KEY,
+    SENDGRID_API_KEY,
+    FROM_EMAIL,
+    EMAIL_HOST_PASSWORD,
+    SENDGRID_TEMPLATE_ID,
+    RESET_LINK,
 )
-from apps.user.dependency import verify_password, get_password_hash
+from apps.user.dependency import (
+    verify_password,
+    get_password_hash,
+    create_reset_token,
+    verify_reset_token,
+)
 import jwt
 from database import SessionDep
 from fastapi import Depends
 from typing import Annotated
 from database import Session
-from apps.user.application.schemas import UserCreateModel
-from apps.user.domain.models import Users
+from apps.user.application.schemas import UserCreateModel,UserProfileCreate
+from apps.user.domain.models import Users, Profile
 from sqlmodel import SQLModel, select
 from database import engine
 from apps.user.application.schemas import TokenData
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+import ssl
+
+# Disable SSL verification (not recommended for production)
+ssl._create_default_https_context = ssl._create_unverified_context
 
 oauth2_schema = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
@@ -63,20 +80,25 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
-async def save_user_to_db(user_data):
+async def save_user_to_db(user_data, session: SessionDep):
     """
     Function to save user data to github user database
     """
 
-    session = Session()
-    existing_user = session.query(Users).filter_by(email=user_data["email"]).first()
+    existing_user = session.query(Users).filter_by(email=user_data.get("email")).first()
+
     if existing_user:
         print(f"User with email:{user_data['email']} already exists in the database.")
     else:
+        name_list = user_data["name"].split()
+        print(name_list)
         user = Users(
             username=user_data["login"],
             email=user_data.get("email"),
             name=user_data["name"],
+            password="",
+            first_name=name_list[0],
+            last_name=name_list[1],
         )
         session.add(user)
         session.commit()
@@ -152,7 +174,7 @@ async def register_user_instance(user_data: UserCreateModel, session: Session):
     return UserDatabase
 
 
-async def github_callback_instance(code: str):
+async def github_callback_instance(code: str, session: SessionDep):
     """
     Domain layer service for Github callback service
     """
@@ -181,8 +203,122 @@ async def github_callback_instance(code: str):
     async with httpx.AsyncClient() as client:
         user_response = await client.get(user_url, headers=headers)
         user_data = user_response.json()
+        await save_user_to_db(user_data, session)
 
     jwt_token = create_access_token(
         {"username": user_data["login"], "sub": user_data["id"]}
     )
     return {"jwt_token": jwt_token, "user": user_data}
+
+
+def mail_service(to_email: str, reset_link: str, session: SessionDep):
+    """
+    Service for sending email using sendgrid api client.
+    """
+    user: Users = session.query(Users).filter_by(email=to_email).first()
+    message = Mail(
+        from_email=FROM_EMAIL,
+        to_emails=to_email,
+    )
+    message.dynamic_template_data = {
+        "username": user.username,
+        "reset_link": reset_link,
+    }
+    message.template_id = SENDGRID_TEMPLATE_ID
+    sg = SendGridAPIClient(SENDGRID_API_KEY)
+    try:
+        response = sg.send(message)
+        print("Email sent successfully!")
+        print(f"Response status code: {response.status_code}")
+        return 1
+    except Exception as e:
+        print(f"Error sending email: {e}")
+
+
+async def password_reset_instance(session: SessionDep, current_user: Users):
+    """
+    Service for Creating reset password token
+    """
+
+    token = create_reset_token(current_user.email)
+    current_user.password_reset_token = token
+    reset_link = RESET_LINK + token
+    session.add(current_user)
+    session.commit()
+    reset_link = RESET_LINK + token
+
+    if mail_service(current_user.email, reset_link, session):
+        return {"message": "Password reset email sent"}
+    else:
+        raise HTTPException(status_code=500, detail="Error sending email")
+
+
+async def password_reset_confirm_instance(
+    new_password: str, session: SessionDep, current_user: Users
+):
+    """
+    Service for Creating reset password token
+    """
+
+    email = verify_reset_token(current_user.password_reset_token)
+    if email is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    current_user.password = get_password_hash(new_password)
+    session.add(current_user)
+    session.commit()
+    return {"message": "Password has been reset successfully"}
+
+
+async def user_profile_delete_instance(
+    username: str, session: SessionDep, current_user: Users
+):
+    """
+    Service for deleting user profile
+    """
+
+    profile = session.exec(select(Profile).where(Profile.username == username)).first()
+
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    if (
+        current_user.username == username
+        or current_user.is_staff
+        or current_user.is_superuser
+    ):  # only admin or one who owns the profile will be able to delete profile
+        session.delete(profile)
+        session.commit()
+        return {"detail": "Profile deleted successfully"}
+    
+
+async def user_profile_update_instance(
+    profile_data: UserProfileCreate, session: SessionDep, current_user: Users
+):
+    """
+    Service for updating user profile
+    """
+
+    profile = session.exec(
+        select(Profile).where(Profile.username == current_user.username)
+    ).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    profile.bio = profile_data.bio if profile_data.bio is not None else profile.bio
+    profile.profile_picture = (
+        profile_data.profile_picture
+        if profile_data.profile_picture is not None
+        else profile.profile_picture
+    )
+    profile.is_private_account = (
+        profile_data.is_private_account
+        if profile_data.is_private_account is not None
+        else profile.is_private_account
+    )
+    profile.modified_at = datetime.now(timezone.utc)
+
+    session.add(profile)
+    session.commit()
+    session.refresh(profile)
+    return profile

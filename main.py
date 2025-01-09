@@ -19,4 +19,4 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(ErrorMiddleware)
 app.add_exception_handler(HTTPException,http_exception_handler)
 
-app.include_router(auth_router.router, prefix="/auth", tags=["Users"])
+app.include_router(auth_router.router, prefix="/auth")
