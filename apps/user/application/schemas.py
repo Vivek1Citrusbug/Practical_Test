@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr
 
 
 class UserBaseModel(SQLModel):
-    username: str
+    username: str = Field(unique=True)
     name: str | None = Field(default=None)
     first_name: str | None = Field(default=None)
     last_name: str | None = Field(default=None)
@@ -33,15 +33,17 @@ class UserCreateModel(SQLModel):
     password: str
 
 
-class AdminCreateModel(SQLModel):
-    username: str
-    name: str
-    first_name: str
-    last_name: str
-    email: str
-    password: str
-    is_staff:bool
-    is_superuser:bool
+class UserProfileCreate(SQLModel):
+    bio: str | None = Field(default=None)
+    profile_picture: str | None = Field(default=None)
+    is_private_account: bool
+
+
+class UserProfilePublic(SQLModel):
+    bio: str | None = Field(default=None)
+    profile_picture: str | None = Field(default=None)
+    is_private_account: bool
+    created_at: str
 
 
 class Token(SQLModel):
@@ -56,5 +58,3 @@ class TokenData(SQLModel):
 
 class PasswordResetRequest(BaseModel):
     email: EmailStr
-
-
