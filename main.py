@@ -2,6 +2,7 @@ from fastapi import FastAPI,HTTPException
 from contextlib import asynccontextmanager
 from apps.user.domain.service import create_db_and_tables
 from apps.user.interface import user_router as auth_router
+from apps.posts.interface import post_router as post_router
 from apps.user.middleware import ErrorMiddleware,http_exception_handler
 
 @asynccontextmanager
@@ -20,3 +21,4 @@ app.add_middleware(ErrorMiddleware)
 app.add_exception_handler(HTTPException,http_exception_handler)
 
 app.include_router(auth_router.router, prefix="/auth")
+app.include_router(post_router.router, prefix="/posts" , tags=["Posts"])

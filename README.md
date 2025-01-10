@@ -13,3 +13,11 @@ starting development server
 
 stargin uvicorn server manually
 - uvicorn main:app --reload
+
+## minio commands
+download minio file.
+start minio server
+- .\minio server /data
+
+set alias for server
+- mc alias set 'myminio' 'http://192.168.1.48:9000' 'minioadmin' 'minioadmin'
