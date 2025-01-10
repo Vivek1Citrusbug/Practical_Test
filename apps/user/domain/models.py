@@ -4,8 +4,6 @@ from datetime import datetime, timezone
 from typing import Optional, TYPE_CHECKING
 from apps.posts.domain.models import Posts
 
-if TYPE_CHECKING:
-    from apps.posts.domain.models import Posts
 
 #############################
 ##### Database model ########
@@ -24,8 +22,6 @@ class Users(UserBaseModel, table=True):
     # Relationship to Profile
     profile: Optional["Profile"] = Relationship(back_populates="user")
 
-    # Relationship to Post
-    posts: list["Posts"] = Relationship(back_populates="user")
 
 
 class Profile(SQLModel, table=True):

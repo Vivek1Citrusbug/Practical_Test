@@ -1,8 +1,11 @@
 from apps.posts.application.schemas import PostBase
 from sqlmodel import Field, SQLModel, Relationship
 from datetime import datetime, timezone
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
+#############################
+##### Database model ########
+#############################
 
 
 class Posts(PostBase, table=True):
@@ -12,6 +15,3 @@ class Posts(PostBase, table=True):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = Field(default=True)
-
-    # Relation with user model
-    # user: Optional["Users"] = Relationship(back_populates="posts")

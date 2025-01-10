@@ -1,3 +1,6 @@
+from typing import Annotated
+
+from fastapi import Depends
 from database import Session
 from apps.user.application.schemas import UserCreateModel, UserProfileCreate
 from apps.user.domain.models import Users
@@ -84,3 +87,9 @@ async def user_profile_get_application(username: str, session: SessionDep):
     """
 
     return await user_profile_get_instance(username, session)
+
+# async def current_active_user_application(token: Annotated[str, Depends(oauth2_schema)], session: SessionDep):
+#     """
+#     Application layer service retriving current active user
+#     """
+#     return await get_current_user(token)
