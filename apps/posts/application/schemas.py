@@ -13,3 +13,21 @@ class PostPublicModel(SQLModel):
     content:str 
     file_url: Optional[str] = Field(default=None)
     created_at: str
+
+class ReportPublicModel(SQLModel):
+    post: int
+    post_by: str 
+    reported_by: str 
+    created_at: str
+
+class CommentPublicModel(SQLModel):
+    id:int
+    comment_by:str
+    content:str
+    created_at:str 
+
+
+class CommentUpdateModel(SQLModel):
+    comment_by:str
+    content:str
+    modified_at:str 

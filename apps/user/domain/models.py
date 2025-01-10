@@ -34,7 +34,7 @@ class Profile(SQLModel, table=True):
     is_active: bool = Field(default=True)
 
     # Foreign key to the Users model
-    username: str = Field(foreign_key="users.username")
+    username: str = Field(foreign_key="users.username",ondelete="CASCADE")
 
     # Relationship to Users
     user: Optional["Users"] = Relationship(back_populates="profile")
