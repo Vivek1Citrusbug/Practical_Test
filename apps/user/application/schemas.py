@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr
 
 
 class UserBaseModel(SQLModel):
-    username: str = Field(unique=True)
+    username: str = Field(unique=True,nullable=False)
     name: str | None = Field(default=None)
     first_name: str | None = Field(default=None)
     last_name: str | None = Field(default=None)

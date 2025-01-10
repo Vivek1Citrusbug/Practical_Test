@@ -1,31 +1,15 @@
 from apps.user.application.schemas import UserBaseModel
 from sqlmodel import Field, SQLModel, Relationship
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+from apps.posts.domain.models import Posts
+
+if TYPE_CHECKING:
+    from apps.posts.domain.models import Posts
 
 #############################
 ##### Database model ########
 #############################
-
-
-# class Users(UserBaseModel, table=True):
-#     email: str = Field(default=None, primary_key=True)
-#     password: str
-#     password_reset_token: str = Field(default="")
-#     is_verified:bool = Field(default=False)
-#     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
-#     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
-#     is_active: bool = Field(default=True)                                            # default is active
-
-
-# class Profile(SQLModel, table=True):
-#     email: str = Field(default=None, primary_key=True)
-#     bio: str = Field(default=None)
-#     profile_picture: str = Field(default=None)
-#     account_type: bool = Field(default=True)                                         # default is private(1)
-#     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
-#     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
-#     is_active: bool = Field(default=True)                                            # default is active
 
 
 class Users(UserBaseModel, table=True):
@@ -39,6 +23,9 @@ class Users(UserBaseModel, table=True):
 
     # Relationship to Profile
     profile: Optional["Profile"] = Relationship(back_populates="user")
+
+    # Relationship to Post
+    posts: list["Posts"] = Relationship(back_populates="user")
 
 
 class Profile(SQLModel, table=True):
@@ -54,4 +41,4 @@ class Profile(SQLModel, table=True):
     username: str = Field(foreign_key="users.username")
 
     # Relationship to Users
-    user: Optional[Users] = Relationship(back_populates="profile")
+    user: Optional["Users"] = Relationship(back_populates="profile")
