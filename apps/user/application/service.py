@@ -13,6 +13,12 @@ from apps.user.domain.service import (
     user_profile_update_instance,
     user_profile_create_instance,
     user_profile_get_instance,
+    create_connection_instance,
+    get_connection_requests_instance,
+    handle_connection_requests_instance,
+    get_followers_instance,
+    get_following_instance,
+    unfollow_user_instance,
 )
 from database import SessionDep
 
@@ -88,8 +94,74 @@ async def user_profile_get_application(username: str, session: SessionDep):
 
     return await user_profile_get_instance(username, session)
 
-# async def current_active_user_application(token: Annotated[str, Depends(oauth2_schema)], session: SessionDep):
-#     """
-#     Application layer service retriving current active user
-#     """
-#     return await get_current_user(token)
+
+async def create_connection_application(
+    username: str,
+    session: SessionDep,
+    current_user: Users,
+):
+    """
+    Application layer service for creating connections
+    """
+
+    return await create_connection_instance(username, session, current_user)
+
+
+async def get_connection_requests_application(
+    session: SessionDep,
+    current_user: Users,
+):
+    """
+    Application layer service for listing connection requests
+    """
+
+    return await get_connection_requests_instance(session, current_user)
+
+
+async def handle_connection_requests_application(
+    username: str,
+    response: str,
+    session: SessionDep,
+    current_user: Users,
+):
+    """
+    Application layer service for handling connection requests
+    """
+
+    return await handle_connection_requests_instance(
+        username, response, session, current_user
+    )
+
+
+async def get_followers_application(
+    session: SessionDep,
+    current_user: Users,
+):
+    """
+    Application layer service for listing followers
+    """
+
+    return await get_followers_instance(session, current_user)
+
+
+async def get_following_application(
+    session: SessionDep,
+    current_user: Users,
+):
+    """
+    Application layer service for listing followings
+    """
+
+    return await get_following_instance(session, current_user)
+
+
+async def unfollow_user_application(
+    username: str,
+    session: SessionDep,
+    current_user: Users,
+):
+    """
+    Application layer service for unfollowing user
+    """
+
+    return await unfollow_user_instance(username, session, current_user)

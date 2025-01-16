@@ -229,7 +229,7 @@ def create_like_instance(
     """
     Domain layer service for creating like
     """
-    
+
     post = session.get(Posts, post_id)
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
@@ -248,3 +248,4 @@ def create_like_instance(
         session.add(like)
         session.commit()
         return {"message": "Post liked"}
+

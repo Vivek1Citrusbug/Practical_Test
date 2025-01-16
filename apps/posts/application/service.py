@@ -131,6 +131,7 @@ def delete_comment_application(
     """
     Application layer service for deleting comment
     """
+    
     return delete_comment_instance(post_id,comment_id,session,current_user)
 
 def create_like_application(
@@ -141,4 +142,5 @@ def create_like_application(
     """
     Application layer service for creating like
     """
+
     return create_like_instance(post_id,session,current_user)

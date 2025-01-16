@@ -11,13 +11,14 @@ from apps.user.application.schemas import (
     UserCreateModel,
     UserPublicModel,
 )
-from fastapi import status
+
 from datetime import datetime, timedelta, timezone
 from config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     GITHUB_CLIENT_ID,
 )
 from apps.user.application.schemas import Token, UserProfileCreate, UserProfilePublic
+from apps.user.domain.models import Connections
 from fastapi.security import OAuth2PasswordRequestForm
 from database import engine, SessionDep
 from apps.user.domain.service import (
@@ -35,10 +36,16 @@ from apps.user.application.service import (
     user_profile_update_application,
     user_profile_create_application,
     user_profile_get_application,
+    create_connection_application,
+    get_connection_requests_application,
+    handle_connection_requests_application,
+    get_followers_application,
+    get_following_application,
+    unfollow_user_application,
 )
+from fastapi import status
 
 router = APIRouter()
-
 
 @router.post("/register", response_model=UserPublicModel, tags=["Users"])
 async def register(user: UserCreateModel, session: SessionDep):
@@ -46,7 +53,6 @@ async def register(user: UserCreateModel, session: SessionDep):
     Function to create user based on the allowed roles
     """
     return await register_user(user, session)
-
 
 @router.post("/token", status_code=status.HTTP_201_CREATED, tags=["Users"])
 async def login_for_access_token(
@@ -136,3 +142,50 @@ async def delete_profile(
 ):
 
     return await user_profile_delete_application(username, session, current_user)
+
+
+@router.post("/connection/{username}/", tags=["Connections"])
+async def create_follow_request(
+    username: str,
+    session: SessionDep,
+    current_user: Users = Depends(get_current_user),
+):
+    return await create_connection_application(username,session,current_user)
+
+@router.post("/connection/",tags=["Connections"])
+async def unfollow_user(
+    username:str,
+    session: SessionDep,
+    current_user: Users = Depends(get_current_user),):
+    return await unfollow_user_application(username,session,current_user)
+
+@router.get("/connection/requests/",tags=["Connections"])
+async def follow_requests(
+    session: SessionDep,
+    current_user: Users = Depends(get_current_user),
+):
+    return await get_connection_requests_application(session,current_user)
+
+@router.post("/connection/request/status",tags=["Connections"])
+async def handle_requests(
+    username:str,
+    response:str,
+    session: SessionDep,
+    current_user: Users = Depends(get_current_user),
+):
+    return await handle_connection_requests_application(username,response,session,current_user)
+
+@router.get("/followers/",tags=["Connections"])
+async def get_followers(
+    session: SessionDep,
+    current_user: Users = Depends(get_current_user),
+):
+    return await get_followers_application(session,current_user)
+
+
+@router.get("/following/",tags=["Connections"])
+async def get_following(
+    session: SessionDep,
+    current_user: Users = Depends(get_current_user),
+):
+    return await get_following_application(session,current_user)
