@@ -15,16 +15,21 @@ class Posts(PostBase, table=True):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = Field(default=True)
-
+    
+    # # Relationship with ReportedPosts
+    # reported_posts: list["ReportedPosts"] = Relationship(back_populates="reported_post")
 
 class ReportedPosts(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    post: int = Field(foreign_key="posts.id", index=True, nullable=False)
+    post: int = Field(foreign_key="posts.id", index=True, nullable=False,ondelete="CASCADE")
     post_by: str = Field(foreign_key="users.username", index=True, nullable=False, ondelete="CASCADE")
     reported_by: str = Field(foreign_key="users.username", index=True, nullable=False, ondelete="CASCADE")
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = Field(default=True)
+
+    # # Relationship with Posts
+    # reported_post: Optional[Posts] = Relationship(back_populates="reported_posts")
 
 
 class Likes(SQLModel, table=True):

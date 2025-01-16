@@ -14,6 +14,12 @@ from config import (
     EMAIL_HOST_PASSWORD,
     SENDGRID_TEMPLATE_ID,
     RESET_LINK,
+    ADMIN_USERNAME,
+    ADMIN_EMAIL,
+    ADMIN_FIRSTNAME,
+    ADMIN_LASTNAME,
+    ADMIN_NAME,
+    ADMIN_PASSWORD,
 )
 from apps.user.dependency import (
     verify_password,
@@ -27,7 +33,7 @@ from fastapi import Depends
 from typing import Annotated
 from database import Session
 from apps.user.application.schemas import UserCreateModel, UserProfileCreate
-from apps.user.domain.models import Users, Profile
+from apps.user.domain.models import Users, Profile, Connections
 from sqlmodel import SQLModel, select
 from database import engine
 from apps.user.application.schemas import TokenData
@@ -327,6 +333,7 @@ async def user_profile_update_instance(
 async def user_profile_create_instance(
     profile: UserProfileCreate, session: SessionDep, current_user: Users
 ):
+
     if getattr(current_user, "is_admin", False):
         raise HTTPException(status_code=403, detail="Admins cannot have profiles")
 
@@ -353,3 +360,203 @@ async def user_profile_get_instance(username: str, session: SessionDep):
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     return profile
+
+
+async def create_connection_instance(
+    username: str, session: SessionDep, current_user: Users
+):
+    """
+    Service for creating connection
+    """
+
+    if username == current_user.username:
+        raise HTTPException(
+            status_code=400,
+            detail="Bad Request",
+        )
+
+    user = session.exec(select(Users).where(Users.username == username)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    connection_instance = session.exec(
+        select(Connections).where(
+            Connections.follower == current_user.username,
+            Connections.following == username,
+        )
+    ).first()
+
+    profile = session.exec(select(Profile).where(Profile.username == username)).first()
+    if not profile:
+        raise HTTPException(
+            status_code=404,
+            detail="Profile not found for the given user.",
+        )
+
+    if not connection_instance:
+        status = 2 if profile.is_private_account else 1
+        new_connection_request = Connections(
+            follower=current_user.username, following=username, status=status
+        )
+        session.add(new_connection_request)
+        session.commit()
+        session.refresh(new_connection_request)
+        return {
+            "message": (
+                "Connection request sent" if status == 2 else "Connection created"
+            )
+        }
+
+    if connection_instance.status == 0:
+        connection_instance.status = 2 if profile.is_private_account else 1
+        session.commit()
+        session.refresh(connection_instance)
+        return {
+            "message": (
+                "Connection request sent"
+                if profile.is_private_account
+                else f"{current_user.username} is now following {username}"
+            )
+        }
+
+    if connection_instance.status == 2:
+        connection_instance.status = 0
+        session.commit()
+        session.refresh(connection_instance)
+        return {"message": "Connection request withdrawn"}
+
+    return {"message": "User is already connected or followed"}
+
+
+async def get_connection_requests_instance(session: SessionDep, current_user: Users):
+    """
+    Domain layer service for listing connection requests.
+    """
+
+    connection_requests: Connections = session.exec(
+        select(Connections).where(
+            Connections.following == current_user.username, Connections.status == 2
+        )
+    ).all()
+    if len(connection_requests) == 0:
+        return {"message": "no requests"}
+    return [myrequest.follower for myrequest in connection_requests]
+
+
+async def handle_connection_requests_instance(
+    username: str, response: str, session: SessionDep, current_user: Users
+):
+    """
+    Domain layer service for handling connection requests.
+    """
+
+    connection_requests: Connections = session.exec(
+        select(Connections).where(
+            Connections.follower == username, Connections.status == 2
+        )
+    ).first()
+    if not connection_requests:
+        raise HTTPException(status_code=404, detail="Connection request not found")
+    else:
+        if response.lower() == "accept":
+            print("Request accepted")
+            connection_requests.status = 1
+            session.commit()
+            session.refresh(connection_requests)
+            return {"message": "request accepted"}
+        elif response.lower() == "reject":
+            print("Request rejected")
+            connection_requests.status = 0
+            session.commit()
+            session.refresh(connection_requests)
+            return {"message": "request rejected"}
+        else:
+            return {"message": "Invalid response"}
+
+
+async def get_followers_instance(session: SessionDep, current_user: Users):
+    """
+    Domain layer service listing followers.
+    """
+
+    connection_requests: Connections = session.exec(
+        select(Connections).where(
+            Connections.following == current_user.username, Connections.status == 1
+        )
+    ).all()
+    print(connection_requests)
+    if not connection_requests:
+        return {"message": "No followers"}
+    return [request.follower for request in connection_requests]
+
+
+async def get_following_instance(session: SessionDep, current_user: Users):
+    """
+    Domain layer service for listing followings.
+    """
+
+    connection_requests: Connections = session.exec(
+        select(Connections).where(
+            Connections.follower == current_user.username, Connections.status == 1
+        )
+    ).all()
+    print(connection_requests)
+    if not connection_requests:
+        return {"message": "No followings"}
+    return [request.following for request in connection_requests]
+
+
+async def unfollow_user_instance(
+    username: str, session: SessionDep, current_user: Users
+):
+    """
+    Domain layer service for unfollowing user.
+    """
+
+    following: Connections = session.exec(
+        select(Connections).where(
+            Connections.follower == current_user.username,
+            Connections.following == username,
+            Connections.status == 1,
+        )
+    ).first()
+    if not following:
+        raise HTTPException(status_code=404, detail="Not following to this user.")
+    following.status = 0
+    session.commit()
+    session.refresh(following)
+    return {"message": f"You unfollowed {username}"}
+
+
+async def create_default_superuser():
+    with Session(engine) as session:
+        statement = select(Users).where(
+            Users.is_superuser == True, Users.is_staff == True
+        )
+        existing_superuser = session.exec(statement).first()
+        if existing_superuser:
+            print("A superuser already exists. Skipping creation.")
+            return
+
+        default_username = ADMIN_USERNAME
+        default_email = ADMIN_EMAIL
+        default_password = ADMIN_PASSWORD
+        hashed_password = get_password_hash(default_password)
+
+        superuser = Users(
+            first_name=ADMIN_FIRSTNAME,
+            last_name=ADMIN_LASTNAME,
+            name=ADMIN_NAME,
+            is_verified=True,
+            username=default_username,
+            email=default_email,
+            password=hashed_password,
+            is_superuser=True,
+            is_staff=True,
+            created_at=datetime.now(timezone.utc),
+            modified_at=datetime.now(timezone.utc),
+            is_active=True
+        )
+        session.add(superuser)
+        session.commit()
+

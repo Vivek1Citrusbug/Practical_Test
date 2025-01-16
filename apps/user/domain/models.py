@@ -23,7 +23,6 @@ class Users(UserBaseModel, table=True):
     profile: Optional["Profile"] = Relationship(back_populates="user")
 
 
-
 class Profile(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     bio: str = Field(default=None)
@@ -34,7 +33,17 @@ class Profile(SQLModel, table=True):
     is_active: bool = Field(default=True)
 
     # Foreign key to the Users model
-    username: str = Field(foreign_key="users.username",ondelete="CASCADE")
+    username: str = Field(foreign_key="users.username", ondelete="CASCADE")
 
     # Relationship to Users
     user: Optional["Users"] = Relationship(back_populates="profile")
+
+
+class Connections(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    follower: str = Field(foreign_key="users.username", ondelete="CASCADE")
+    following: str = Field(foreign_key="users.username", ondelete="CASCADE")
+    status: int  # status: 0 - rejected, 1 - accepted, 2 - pending
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
+    modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
+    is_active: bool = Field(default=True)
