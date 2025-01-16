@@ -3,4 +3,8 @@ from database import SessionDep
 from apps.user.domain.models import Users
 
 def get_reported_post_application(session:SessionDep,current_user:Users):
+    """
+    Application layer service for listing reported posts
+    """
+    
     return get_reported_post_instance(session,current_user)
