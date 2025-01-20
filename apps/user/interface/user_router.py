@@ -1,4 +1,5 @@
 import httpx
+import stripe
 from fastapi.responses import RedirectResponse
 import jwt
 from typing import Annotated
@@ -16,6 +17,9 @@ from datetime import datetime, timedelta, timezone
 from config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     GITHUB_CLIENT_ID,
+    STRIPE_API_KEY,
+    STRIP_SUCCESS_URL,
+    STRIP_FAILURE_URL,
 )
 from apps.user.application.schemas import Token, UserProfileCreate, UserProfilePublic
 from apps.user.domain.models import Connections
@@ -205,7 +209,7 @@ async def get_following(
 
 
 
-
+stripe.api_key = STRIPE_API_KEY
 
 
 @router.post("/create-checkout-session")
@@ -219,15 +223,15 @@ async def checkout(amount: int, session: SessionDep):
                 {
                     "price_data": {
                         "currency": "usd",
-                        "product_data": {"name": "Be Admin"}, 
+                        "product_data": {"name": "Subscription"}, 
                         "unit_amount": amount,
                     },
                     "quantity": 1,
                 },
             ],
             mode="payment",
-            success_url="https://example.com/success", ## Given this sample link for success and failure but we have to take this as environment variable.
-            cancel_url="https://example.com/failure",
+            success_url=STRIP_SUCCESS_URL,
+            cancel_url=STRIP_FAILURE_URL,
         )
         print(session)
 
@@ -237,23 +241,18 @@ async def checkout(amount: int, session: SessionDep):
         )
 
 
-@router.get("/success/{session_id}")
-async def success(
-    session_id: str,
-    db_session: SessionDep,
-    current_user: Annotated[UserPublicModel, Depends(get_current_active_user)],
-):
-    session = stripe.checkout.Session.retrieve(session_id)
-    user = db_session.get(UserModel, current_user.username)
-    if user:
-        user.is_staff = True
-        user.is_superuser = True
-        db_session.commit()
-        return {"message": "Payment successful, role upgraded to admin."}
-    else:
-        raise HTTPException(status_code=404, detail="User not found")
-
-
-@router.post(
-    "/token",
-    status_code=status.HTTP_201_CREATED,
+# @router.get("/success/{session_id}")
+# async def success(
+#     session_id: str,
+#     db_session: SessionDep,
+#     current_user: Annotated[UserPublicModel, Depends(get_current_active_user)],
+# ):
+#     session = stripe.checkout.Session.retrieve(session_id)
+#     user = db_session.get(UserModel, current_user.username)
+#     if user:
+#         user.is_staff = True
+#         user.is_superuser = True
+#         db_session.commit()
+#         return {"message": "Payment successful, role upgraded to admin."}
+#     else:
+#         raise HTTPException(status_code=404, detail="User not found")
