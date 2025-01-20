@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, UploadFile
 from database import Session
 from apps.user.application.schemas import UserCreateModel, UserProfileCreate
 from apps.user.domain.models import Users
@@ -78,13 +78,19 @@ async def user_profile_update_application(
 
 
 async def user_profile_create_application(
-    profile: UserProfileCreate, session: SessionDep, current_user: Users
+    bio: str,
+    is_private_account: bool,
+    session: SessionDep,
+    current_user: Users,
+    file: UploadFile | None,
 ):
     """
     Application layer service for creating user profile
     """
 
-    return await user_profile_create_instance(profile, session, current_user)
+    return await user_profile_create_instance(
+        bio, is_private_account, session, current_user, file
+    )
 
 
 async def user_profile_get_application(username: str, session: SessionDep):

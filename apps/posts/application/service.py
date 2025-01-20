@@ -10,6 +10,7 @@ from apps.posts.domain.service import (
     update_comment_instance,
     delete_comment_instance,
     create_like_instance,
+    list_recommended_posts_instance
 )
 from apps.user.domain.models import Users
 from apps.user.domain.service import get_current_user
@@ -20,50 +21,57 @@ def create_post_application(
     session: SessionDep,
     title: str,
     content: str,
+    current_user: Users,
     file: UploadFile | None = None,
-    current_user: Users = Depends(get_current_user),
 ):
     """
     Application layer service for creating post
     """
 
-    return create_post_instance(session, title, content, file, current_user)
+    return create_post_instance(session, title, content,  current_user, file)
 
 
 def list_posts_application(
     session: SessionDep,
+    current_user: Users,
     skip: int = 0,
     limit: int = 10,
     post_id: int = None,
     username: str = None,
-    current_user: Users = Depends(get_current_user),
 ):
     """
     Application layer service for listing posts
     """
 
-    return list_posts_instance(session, skip, limit, post_id, username, current_user)
+    return list_posts_instance(session,current_user, skip, limit, post_id, username)
 
+def list_recommended_posts_application(
+    session: SessionDep,
+    current_user: Users,
+):
+    """Application layer service for listing recommended post to users"""
+    return list_recommended_posts_instance(session,current_user)
+    
 
 def update_post_application(
     post_id: int,
     session: SessionDep,
+    current_user: Users,
     title: str | None = None,
     content: str | None = None,
     file: UploadFile | None = None,
-    current_user: Users = Depends(get_current_user),
 ):
     """
     Application layer service for updating post
     """
 
-    return update_post_instance(post_id, session, title, content, file, current_user)
+    return update_post_instance(post_id, session, current_user, title, content, file)
 
 
 def delete_post_application(
     post_id: int,
     session: SessionDep,
-    current_user: Users = Depends(get_current_user),
+    current_user: Users,
 ):
     """
     Application layer service for deleting post
@@ -75,7 +83,7 @@ def delete_post_application(
 def report_post_application(
     post_id: int,
     session: SessionDep,
-    current_user: Users = Depends(get_current_user),
+    current_user: Users,
 ):
     """
     Application layer service for reporting post
@@ -88,7 +96,7 @@ def create_comment_application(
     post_id: int,
     content,
     session: SessionDep,
-    current_user: Users = Depends(get_current_user),
+    current_user: Users,
 ):
     """
     Application layer service for creating comment
@@ -100,7 +108,7 @@ def create_comment_application(
 def list_comments_application(
     post_id: int,
     session: SessionDep,
-    current_user: Users = Depends(get_current_user),
+    current_user: Users,
 ):
     """
     Application layer service for listing comments
@@ -114,7 +122,7 @@ def update_comment_application(
     content,
     comment_id,
     session: SessionDep,
-    current_user: Users = Depends(get_current_user),
+    current_user: Users,
 ):
     """
     Application layer service for updating comments
@@ -126,7 +134,7 @@ def delete_comment_application(
     post_id,
     comment_id,
     session: SessionDep,
-    current_user: Users = Depends(get_current_user),
+    current_user: Users,
 ):
     """
     Application layer service for deleting comment
@@ -137,7 +145,7 @@ def delete_comment_application(
 def create_like_application(
     post_id, 
     session: SessionDep, 
-    current_user: Users = Depends(get_current_user),
+    current_user: Users,
 ):
     """
     Application layer service for creating like

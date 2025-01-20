@@ -22,6 +22,7 @@ from apps.posts.application.service import (
     update_comment_application,
     delete_comment_application,
     create_like_application,
+    list_recommended_posts_application
 )
 
 router = APIRouter()
@@ -32,34 +33,43 @@ def create_post(
     session: SessionDep,
     title: str,
     content: str,
-    file: UploadFile | None = None,
     current_user: Users = Depends(get_current_user),
+    file: UploadFile | None = None,
+    
 ):
-    return create_post_application(session, title, content, file, current_user)
+    return create_post_application(session, title, content,current_user, file)
 
 
 @router.get("/", response_model=List[PostPublicModel])
 def list_posts(
     session: SessionDep,
+    current_user: Users = Depends(get_current_user),
     skip: int = 0,
     limit: int = 10,
     post_id: int = None,
     username: str = None,
+):
+    return list_posts_application(session,current_user, skip, limit, post_id, username)
+
+
+@router.get("/recommended_posts/", response_model=List[PostPublicModel])
+def list_recommended_posts(
+    session: SessionDep,
     current_user: Users = Depends(get_current_user),
 ):
-    return list_posts_application(session, skip, limit, post_id, username, current_user)
+    return list_recommended_posts_application(session, current_user)
 
 
 @router.put("/{post_id}/", response_model=PostPublicModel)
 def update_post(
     post_id: int,
     session: SessionDep,
+    current_user: Users = Depends(get_current_user),
     title: str | None = None,
     content: str | None = None,
     file: UploadFile | None = None,
-    current_user: Users = Depends(get_current_user),
 ):
-    return update_post_application(post_id, session, title, content, file, current_user)
+    return update_post_application(post_id, session, current_user,title, content, file)
 
 
 @router.delete("/{post_id}/")
