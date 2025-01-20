@@ -33,22 +33,23 @@ def create_post(
     session: SessionDep,
     title: str,
     content: str,
-    file: UploadFile | None = None,
     current_user: Users = Depends(get_current_user),
+    file: UploadFile | None = None,
+    
 ):
-    return create_post_application(session, title, content, file, current_user)
+    return create_post_application(session, title, content,current_user, file)
 
 
 @router.get("/", response_model=List[PostPublicModel])
 def list_posts(
     session: SessionDep,
+    current_user: Users = Depends(get_current_user),
     skip: int = 0,
     limit: int = 10,
     post_id: int = None,
     username: str = None,
-    current_user: Users = Depends(get_current_user),
 ):
-    return list_posts_application(session, skip, limit, post_id, username, current_user)
+    return list_posts_application(session,current_user, skip, limit, post_id, username)
 
 
 @router.get("/recommended_posts/", response_model=List[PostPublicModel])
@@ -63,12 +64,12 @@ def list_posts(
 def update_post(
     post_id: int,
     session: SessionDep,
+    current_user: Users = Depends(get_current_user),
     title: str | None = None,
     content: str | None = None,
     file: UploadFile | None = None,
-    current_user: Users = Depends(get_current_user),
 ):
-    return update_post_application(post_id, session, title, content, file, current_user)
+    return update_post_application(post_id, session, current_user,title, content, file)
 
 
 @router.delete("/{post_id}/")

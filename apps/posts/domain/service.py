@@ -14,8 +14,8 @@ def create_post_instance(
     session: SessionDep,
     title: str,
     content: str,
+    current_user: Users,
     file: UploadFile | None = None,
-    current_user: Users = Depends(get_current_user),
 ):
     """
     Domain layer service for creating post
@@ -25,8 +25,12 @@ def create_post_instance(
         file_url = None
         if file:
             file_bytes = file.file.read()
-            file_extension = file.filename.split('.')[-1] if '.' in file.filename else ''
-            file_url = upload_to_minio(file_bytes, str(uuid.uuid4())+"."+file_extension)
+            file_extension = (
+                file.filename.split(".")[-1] if "." in file.filename else ""
+            )
+            file_url = upload_to_minio(
+                file_bytes, str(uuid.uuid4()) + "." + file_extension
+            )
 
         post = Posts(
             title=title,
@@ -51,11 +55,11 @@ def create_post_instance(
 
 def list_posts_instance(
     session: SessionDep,
+    current_user: Users,
     skip: int = 0,
     limit: int = 10,
     post_id: int = None,
     username: str = None,
-    current_user: Users = Depends(get_current_user),
 ):
     """
     Domain layer service for listing posts
@@ -74,26 +78,26 @@ def list_recommended_posts_instance(session: SessionDep, current_user: Users):
     """
     Domain layer service for listing post recommendation
     """
+
     query = select(Likes).filter(Likes.liked_by == current_user.username)
     liked_posts = session.exec(query).all()
-
-    # Extract the post IDs from the `Likes` objects
     liked_post_ids = [like.post for like in liked_posts]
     print(liked_post_ids)
-
-    posts = session.query(Posts).filter(Posts.id.not_in(liked_post_ids)).all()
+    query = select(Posts).filter(
+        Posts.id.not_in(liked_post_ids), Posts.post_by != current_user.username
+    )
+    posts = session.exec(query).all()
     random_posts = random.sample(posts, min(5, len(posts)))
-    # print(result)
     return random_posts
 
 
 def update_post_instance(
     post_id: int,
     session: SessionDep,
+    current_user: Users,
     title: str | None = None,
     content: str | None = None,
     file: UploadFile | None = None,
-    current_user: Users = Depends(get_current_user),
 ):
     """
     Domain layer service for updating post
