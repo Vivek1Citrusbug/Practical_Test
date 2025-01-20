@@ -332,13 +332,19 @@ async def user_profile_update_instance(
 
 
 async def user_profile_create_instance(
-    bio:str,is_private_account:bool, session: SessionDep, current_user: Users,file: UploadFile | None,
+    bio: str,
+    is_private_account: bool,
+    session: SessionDep,
+    current_user: Users,
+    file: UploadFile | None,
 ):
 
     if current_user.is_staff or current_user.is_superuser:
         raise HTTPException(status_code=403, detail="Admins cannot have profiles")
 
-    existing_profile = session.exec(select(Profile).where(Profile.username == current_user.username)).first()
+    existing_profile = session.exec(
+        select(Profile).where(Profile.username == current_user.username)
+    ).first()
     if existing_profile:
         raise HTTPException(status_code=400, detail="User already has a profile")
 
@@ -346,7 +352,7 @@ async def user_profile_create_instance(
     if file:
         file_bytes = file.file.read()
         file_url = upload_to_minio(file_bytes, file.filename)
-        
+
     new_profile = Profile(
         bio=bio,
         profile_picture=str(file_url),
@@ -559,8 +565,7 @@ async def create_default_superuser():
             is_staff=True,
             created_at=datetime.now(timezone.utc),
             modified_at=datetime.now(timezone.utc),
-            is_active=True
+            is_active=True,
         )
         session.add(superuser)
         session.commit()
-
