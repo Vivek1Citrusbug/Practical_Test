@@ -191,3 +191,69 @@ async def get_following(
     current_user: Users = Depends(get_current_user),
 ):
     return await get_following_application(session,current_user)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@router.post("/create-checkout-session")
+async def checkout(amount: int, session: SessionDep):
+    if amount != 500:
+        raise HTTPException(status_code=400, detail="Amount must be $5")
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[
+                {
+                    "price_data": {
+                        "currency": "usd",
+                        "product_data": {"name": "Be Admin"}, 
+                        "unit_amount": amount,
+                    },
+                    "quantity": 1,
+                },
+            ],
+            mode="payment",
+            success_url="https://example.com/success", ## Given this sample link for success and failure but we have to take this as environment variable.
+            cancel_url="https://example.com/failure",
+        )
+        print(session)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=400, detail=f"Error creating checkout session: {str(e)}"
+        )
+
+
+@router.get("/success/{session_id}")
+async def success(
+    session_id: str,
+    db_session: SessionDep,
+    current_user: Annotated[UserPublicModel, Depends(get_current_active_user)],
+):
+    session = stripe.checkout.Session.retrieve(session_id)
+    user = db_session.get(UserModel, current_user.username)
+    if user:
+        user.is_staff = True
+        user.is_superuser = True
+        db_session.commit()
+        return {"message": "Payment successful, role upgraded to admin."}
+    else:
+        raise HTTPException(status_code=404, detail="User not found")
+
+
+@router.post(
+    "/token",
+    status_code=status.HTTP_201_CREATED,

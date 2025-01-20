@@ -53,7 +53,7 @@ def list_posts(
 
 
 @router.get("/recommended_posts/", response_model=List[PostPublicModel])
-def list_posts(
+def list_recommended_posts(
     session: SessionDep,
     current_user: Users = Depends(get_current_user),
 ):

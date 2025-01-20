@@ -21,7 +21,6 @@ def get_reported_post_instance(session: SessionDep, current_user: Users):
             if post_id not in result:
                 result[post_id] = []
             result[post_id].append(reported_by)
-
         # returning dictionary having post id as key and list of user who reported that post as value
         return result
     else:
@@ -54,7 +53,7 @@ def delete_post_instance(post_id: int, session: SessionDep, current_user: Users)
             target_user.username,
             deleting_post.title,
             removal_reason="Your post has been removed as it does not comply with our company's content policy.",
-        )
+        )   
         return {"detail": "Post deleted successfully."}
     else:
         raise HTTPException(
