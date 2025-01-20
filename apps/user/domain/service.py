@@ -1,4 +1,5 @@
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, UploadFile, status
 import httpx
@@ -351,7 +352,8 @@ async def user_profile_create_instance(
     file_url = None
     if file:
         file_bytes = file.file.read()
-        file_url = upload_to_minio(file_bytes, file.filename)
+        file_extension = file.filename.split('.')[-1] if '.' in file.filename else ''
+        file_url = upload_to_minio(file_bytes, str(uuid.uuid4())+"."+file_extension)
 
     new_profile = Profile(
         bio=bio,

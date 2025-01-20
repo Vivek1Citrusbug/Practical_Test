@@ -22,6 +22,7 @@ from apps.posts.application.service import (
     update_comment_application,
     delete_comment_application,
     create_like_application,
+    list_recommended_posts_application
 )
 
 router = APIRouter()
@@ -48,6 +49,14 @@ def list_posts(
     current_user: Users = Depends(get_current_user),
 ):
     return list_posts_application(session, skip, limit, post_id, username, current_user)
+
+
+@router.get("/recommended_posts/", response_model=List[PostPublicModel])
+def list_posts(
+    session: SessionDep,
+    current_user: Users = Depends(get_current_user),
+):
+    return list_recommended_posts_application(session, current_user)
 
 
 @router.put("/{post_id}/", response_model=PostPublicModel)

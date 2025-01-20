@@ -6,6 +6,7 @@ from config import (
     MINIO_STORAGE_ACCESS_KEY,
     MINIO_STORAGE_SECRET_KEY,
     MINIO_BUCKET_NAME,
+    MINIO_POST_FILE_BUCKET,
 )
 
 s3 = boto3.client(
@@ -18,13 +19,14 @@ s3 = boto3.client(
 
 def upload_to_minio(file: bytes, filename: str):
     try:
+        
         s3.put_object(
-            Bucket=MINIO_BUCKET_NAME,
+            Bucket=MINIO_POST_FILE_BUCKET,
             Key=filename,
             Body=file,
             ContentType="application/octet-stream",
         )
-        return f"http://{MINIO_STORAGE_ENDPOINT}/{MINIO_BUCKET_NAME}/{filename}"
+        return f"http://{MINIO_STORAGE_ENDPOINT}/{MINIO_POST_FILE_BUCKET}/{filename}"
 
     except NoCredentialsError:
         return "Credentials not available"

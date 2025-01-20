@@ -10,6 +10,7 @@ from apps.posts.domain.service import (
     update_comment_instance,
     delete_comment_instance,
     create_like_instance,
+    list_recommended_posts_instance
 )
 from apps.user.domain.models import Users
 from apps.user.domain.service import get_current_user
@@ -44,6 +45,13 @@ def list_posts_application(
 
     return list_posts_instance(session, skip, limit, post_id, username, current_user)
 
+def list_recommended_posts_application(
+    session: SessionDep,
+    current_user: Users = Depends(get_current_user),
+):
+    """Application layer service for listing recommended post to users"""
+    return list_recommended_posts_instance(session,current_user)
+    
 
 def update_post_application(
     post_id: int,

@@ -1,6 +1,8 @@
+import random
+import uuid
 from sqlmodel import select
 from datetime import datetime, timezone
-from apps.posts.domain.models import Posts, Likes, Comments,ReportedPosts
+from apps.posts.domain.models import Posts, Likes, Comments, ReportedPosts
 from database import SessionDep
 from fastapi import FastAPI, HTTPException, UploadFile, Form, Depends, APIRouter, status
 from apps.user.domain.service import get_current_user
@@ -19,17 +21,32 @@ def create_post_instance(
     Domain layer service for creating post
     """
 
-    file_url = None
-    if file:
-        file_bytes = file.file.read()
-        file_url = upload_to_minio(file_bytes, file.filename)
-    post = Posts(
-        title=title, content=content, file_url=file_url, post_by=current_user.username
-    )
-    session.add(post)
-    session.commit()
-    session.refresh(post)
-    return post
+    try:
+        file_url = None
+        if file:
+            file_bytes = file.file.read()
+            file_extension = file.filename.split('.')[-1] if '.' in file.filename else ''
+            file_url = upload_to_minio(file_bytes, str(uuid.uuid4())+"."+file_extension)
+
+        post = Posts(
+            title=title,
+            content=content,
+            file_url=file_url,
+            post_by=current_user.username,
+        )
+
+        session.add(post)
+        session.commit()
+        session.refresh(post)
+
+        return post
+
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while creating the post: {str(e)}",
+        )
 
 
 def list_posts_instance(
@@ -51,6 +68,23 @@ def list_posts_instance(
     if post_id:
         query = query.where(Posts.id.contains(post_id))
     return session.exec(query).all()
+
+
+def list_recommended_posts_instance(session: SessionDep, current_user: Users):
+    """
+    Domain layer service for listing post recommendation
+    """
+    query = select(Likes).filter(Likes.liked_by == current_user.username)
+    liked_posts = session.exec(query).all()
+
+    # Extract the post IDs from the `Likes` objects
+    liked_post_ids = [like.post for like in liked_posts]
+    print(liked_post_ids)
+
+    posts = session.query(Posts).filter(Posts.id.not_in(liked_post_ids)).all()
+    random_posts = random.sample(posts, min(5, len(posts)))
+    # print(result)
+    return random_posts
 
 
 def update_post_instance(
@@ -111,6 +145,7 @@ def delete_post_instance(
     session.commit()
     return {"detail": "Post deleted"}
 
+
 def report_post_instance(
     post_id: int,
     session: SessionDep,
@@ -119,7 +154,7 @@ def report_post_instance(
     """
     Domain layer service for reporting post
     """
-     
+
     query = select(Posts).where(Posts.id == post_id)
     post: Posts = session.exec(query).first()
 
@@ -140,6 +175,7 @@ def report_post_instance(
     session.refresh(reporting_post)
     return reporting_post
 
+
 def create_comment_instance(
     post_id: int,
     content,
@@ -156,6 +192,7 @@ def create_comment_instance(
     session.refresh(comment)
     return comment
 
+
 def list_comments_instance(
     post_id: int,
     session: SessionDep,
@@ -169,9 +206,10 @@ def list_comments_instance(
     comments = session.exec(query).all()
 
     if not comments:
-        return []  
+        return []
 
     return comments
+
 
 def update_comment_instance(
     post_id,
@@ -194,6 +232,7 @@ def update_comment_instance(
     comment.modified_at = datetime.now(timezone.utc)
     session.commit()
     return comment
+
 
 def delete_comment_instance(
     post_id,
@@ -221,9 +260,10 @@ def delete_comment_instance(
     session.commit()
     return {"message": "Comment deleted successfully"}
 
+
 def create_like_instance(
-    post_id, 
-    session: SessionDep, 
+    post_id,
+    session: SessionDep,
     current_user: Users = Depends(get_current_user),
 ):
     """
@@ -248,4 +288,3 @@ def create_like_instance(
         session.add(like)
         session.commit()
         return {"message": "Post liked"}
-
