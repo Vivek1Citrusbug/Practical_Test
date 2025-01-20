@@ -2,7 +2,7 @@ import httpx
 from fastapi.responses import RedirectResponse
 import jwt
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, requests
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, requests
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import SQLModel, select
 from apps.user.domain.models import Users, Profile
@@ -112,12 +112,14 @@ async def password_reset_confirm(
 
 @router.post("/profiles/", response_model=UserProfilePublic, tags=["Profile"])
 async def create_profile(
-    profile: UserProfileCreate,
     session: SessionDep,
+    bio: str = Form(...),
+    is_private_account: bool = Form(...),
     current_user: Users = Depends(get_current_user),
+    file: UploadFile | None = None,
 ):
 
-    return await user_profile_create_application(profile, session, current_user)
+    return await user_profile_create_application(bio,is_private_account, session, current_user,file)
 
 
 @router.get("/profiles/{username}", response_model=UserProfilePublic, tags=["Profile"])

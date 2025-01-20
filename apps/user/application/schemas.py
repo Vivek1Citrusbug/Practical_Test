@@ -35,7 +35,6 @@ class UserCreateModel(SQLModel):
 
 class UserProfileCreate(SQLModel):
     bio: str | None = Field(default=None)
-    profile_picture: str | None = Field(default=None)
     is_private_account: bool
 
 

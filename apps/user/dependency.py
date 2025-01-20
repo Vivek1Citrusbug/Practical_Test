@@ -1,4 +1,6 @@
 import jwt
+import os
+import boto3
 from sqlmodel import SQLModel, select
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -8,7 +10,22 @@ from config import ACCESS_TOKEN_EXPIRE_MINUTES, ALGORITHM, SECRET_KEY
 from typing import Annotated, Union
 from jwt.exceptions import InvalidTokenError
 from datetime import UTC, datetime, timedelta
+from botocore.exceptions import NoCredentialsError
+from config import (
+    MINIO_STORAGE_ENDPOINT,
+    MINIO_STORAGE_ACCESS_KEY,
+    MINIO_STORAGE_SECRET_KEY,
+    MINIO_BUCKET_NAME,
+    MINIO_PROFILE_PICTURE_BUCKET,
+    MINIO_POST_FILE_BUCKET,
+)
 
+s3 = boto3.client(
+    "s3",
+    endpoint_url=f"http://{MINIO_STORAGE_ENDPOINT}",
+    aws_access_key_id=MINIO_STORAGE_ACCESS_KEY,
+    aws_secret_access_key=MINIO_STORAGE_SECRET_KEY,
+)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -52,4 +69,20 @@ def verify_reset_token(token: str):
     except Exception as e:
         return f"An unexpected error occurred: {str(e)}"
     
+
+def upload_to_minio(file: bytes, filename: str):
+    try:
+        s3.put_object(
+            Bucket=MINIO_PROFILE_PICTURE_BUCKET,
+            Key=filename,
+            Body=file,
+            ContentType="application/octet-stream",
+        )
+        return f"http://{MINIO_STORAGE_ENDPOINT}/{MINIO_PROFILE_PICTURE_BUCKET}/{filename}"
+
+    except NoCredentialsError:
+        return "Credentials not available"
+    except Exception as e:
+        return f"Error uploading file: {str(e)}"
+
 

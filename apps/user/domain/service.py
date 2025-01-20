@@ -1,8 +1,9 @@
 import os
 from datetime import datetime, timedelta, timezone
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 import httpx
 from passlib.context import CryptContext
+from apps.user.dependency import upload_to_minio
 from config import (
     ALGORITHM,
     GITHUB_CLIENT_ID,
@@ -331,22 +332,25 @@ async def user_profile_update_instance(
 
 
 async def user_profile_create_instance(
-    profile: UserProfileCreate, session: SessionDep, current_user: Users
+    bio:str,is_private_account:bool, session: SessionDep, current_user: Users,file: UploadFile | None,
 ):
 
-    if getattr(current_user, "is_admin", False):
+    if current_user.is_staff or current_user.is_superuser:
         raise HTTPException(status_code=403, detail="Admins cannot have profiles")
 
-    existing_profile = session.exec(
-        select(Profile).where(Profile.username == current_user.username)
-    ).first()
+    existing_profile = session.exec(select(Profile).where(Profile.username == current_user.username)).first()
     if existing_profile:
         raise HTTPException(status_code=400, detail="User already has a profile")
 
+    file_url = None
+    if file:
+        file_bytes = file.file.read()
+        file_url = upload_to_minio(file_bytes, file.filename)
+        
     new_profile = Profile(
-        bio=profile.bio,
-        profile_picture=profile.profile_picture,
-        is_private_account=profile.is_private_account,
+        bio=bio,
+        profile_picture=str(file_url),
+        is_private_account=is_private_account,
         username=current_user.username,
     )
     session.add(new_profile)
