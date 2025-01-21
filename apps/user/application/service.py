@@ -87,8 +87,8 @@ async def user_profile_create_application(
     bio: str,
     is_private_account: bool,
     session: SessionDep,
-    files: List[UploadFile] | None,
     current_user: Users,
+    files: List[UploadFile] | None,
     
 ):
     """

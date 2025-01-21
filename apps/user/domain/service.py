@@ -373,10 +373,11 @@ async def user_profile_create_instance(
 
     new_profile = Profile(
         bio=bio,
-        profile_pictures=file_urls,  
+        profile_picture=file_urls,
         is_private_account=is_private_account,
         username=current_user.username,
     )
+    
     print(new_profile)
     session.add(new_profile)
     session.commit()
