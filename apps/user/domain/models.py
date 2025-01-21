@@ -26,7 +26,7 @@ class Users(UserBaseModel, table=True):
 class Profile(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     bio: str = Field(default=None)
-    profile_picture: str = Field(default=None)
+    profile_picture: Optional[str] = Field(default=None)
     is_private_account: bool = Field(default=True)  # Default is private (True)
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))

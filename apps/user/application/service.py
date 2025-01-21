@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, List
 
 from fastapi import Depends, UploadFile
 from database import Session
@@ -70,28 +70,33 @@ async def user_profile_delete_application(
 
 
 async def user_profile_update_application(
-    profile_data: UserProfileCreate, session: SessionDep, current_user: Users
+    bio: str | None,
+    is_private_account: bool | None,
+    session: SessionDep,
+    file:UploadFile | None ,
+    current_user: Users,
 ):
     """
     Application layer service for updating user profile
     """
 
-    return await user_profile_update_instance(profile_data, session, current_user)
+    return await user_profile_update_instance(bio,is_private_account,session,file,current_user)
 
 
 async def user_profile_create_application(
     bio: str,
     is_private_account: bool,
     session: SessionDep,
+    files: List[UploadFile] | None,
     current_user: Users,
-    file: UploadFile | None,
+    
 ):
     """
     Application layer service for creating user profile
     """
 
     return await user_profile_create_instance(
-        bio, is_private_account, session, current_user, file
+        bio, is_private_account, session,files, current_user
     )
 
 

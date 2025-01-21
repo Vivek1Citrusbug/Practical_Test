@@ -131,14 +131,15 @@ async def password_reset_confirm(
 @router.post("/profiles/", response_model=UserProfilePublic, tags=["Profile"])
 async def create_profile(
     session: SessionDep,
+    file: list[UploadFile] | None,
     bio: str = Form(...),
     is_private_account: bool = Form(...),
     current_user: Users = Depends(get_current_user),
-    file: UploadFile | None = None,
+    
 ):
 
     return await user_profile_create_application(
-        bio, is_private_account, session, current_user, file
+        bio, is_private_account, session, current_user,file
     )
 
 
@@ -148,12 +149,9 @@ async def get_profile(username: str, session: SessionDep):
 
 
 @router.put("/profiles/{username}", response_model=UserProfilePublic, tags=["Profile"])
-async def update_profile(
-    profile_data: UserProfileCreate,
-    session: SessionDep,
-    current_user: Users = Depends(get_current_user),
+async def update_profile(bio: str | None,is_private_account: bool | None,session: SessionDep,file:UploadFile | None,current_user: Users = Depends(get_current_user),
 ):
-    return await user_profile_update_application(profile_data, session, current_user)
+    return await user_profile_update_application(bio,is_private_account,session,file,current_user)
 
 
 @router.delete("/profiles/{username}", tags=["Profile"])

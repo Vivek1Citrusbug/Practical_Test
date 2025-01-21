@@ -33,7 +33,7 @@ import jwt
 from apps.user.dependency import ConnectionResponse
 from database import SessionDep
 from fastapi import Depends
-from typing import Annotated
+from typing import Annotated, List
 from database import Session
 from apps.user.application.schemas import UserCreateModel, UserProfileCreate
 from apps.user.domain.models import Users, Profile, Connections
@@ -302,27 +302,29 @@ async def user_profile_delete_instance(
 
 
 async def user_profile_update_instance(
-    profile_data: UserProfileCreate, session: SessionDep, current_user: Users
+    bio:str,
+    is_private_account:bool,
+    file: UploadFile | None,
+    session: SessionDep, 
+    current_user: Users
 ):
     """
-    Service for updating user profile
+    Domain layer Service for updating user profile
     """
 
-    profile = session.exec(
-        select(Profile).where(Profile.username == current_user.username)
-    ).first()
+    profile = session.exec(select(Profile).where(Profile.username == current_user.username)).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    profile.bio = profile_data.bio if profile_data.bio is not None else profile.bio
+    profile.bio = bio if bio is not None else profile.bio
     profile.profile_picture = (
-        profile_data.profile_picture
-        if profile_data.profile_picture is not None
+        file
+        if file is not None
         else profile.profile_picture
     )
     profile.is_private_account = (
-        profile_data.is_private_account
-        if profile_data.is_private_account is not None
+        is_private_account
+        if is_private_account is not None
         else profile.is_private_account
     )
     profile.modified_at = datetime.now(timezone.utc)
@@ -332,14 +334,16 @@ async def user_profile_update_instance(
     session.refresh(profile)
     return profile
 
-
 async def user_profile_create_instance(
     bio: str,
     is_private_account: bool,
     session: SessionDep,
+    files: List[UploadFile],  
     current_user: Users,
-    file: UploadFile | None,
 ):
+    """
+    Service for creating user profiles with multiple file uploads (images/videos only).
+    """
 
     if current_user.is_staff or current_user.is_superuser:
         raise HTTPException(status_code=403, detail="Admins cannot have profiles")
@@ -350,21 +354,34 @@ async def user_profile_create_instance(
     if existing_profile:
         raise HTTPException(status_code=400, detail="User already has a profile")
 
-    file_url = None
-    if file:
-        file_bytes = file.file.read()
-        file_extension = file.filename.split('.')[-1] if '.' in file.filename else ''
-        file_url = upload_to_minio(file_bytes, str(uuid.uuid4())+"."+file_extension)
+    allowed_extensions = {"jpg", "jpeg", "png", "gif", "mp4", "mkv", "avi", "mov"}  
+    file_urls = []
+
+    for file in files:
+        file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
+        
+        if file_extension not in allowed_extensions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {file.filename}. Allowed types: {', '.join(allowed_extensions)}"
+            )
+
+       
+        file_bytes = await file.read()  
+        file_url = upload_to_minio(file_bytes, str(uuid.uuid4()) + "." + file_extension)
+        file_urls.append(file_url)
 
     new_profile = Profile(
         bio=bio,
-        profile_picture=str(file_url),
+        profile_pictures=file_urls,  
         is_private_account=is_private_account,
         username=current_user.username,
     )
+    print(new_profile)
     session.add(new_profile)
     session.commit()
     session.refresh(new_profile)
+
     return new_profile
 
 
