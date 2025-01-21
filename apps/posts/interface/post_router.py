@@ -90,7 +90,7 @@ def report_post(
     return report_post_application(post_id, session, current_user)
 
 
-@router.post("{post_id}/comments/create/", response_model=CommentPublicModel)
+@router.post("/{post_id}/comments/create/", response_model=CommentPublicModel)
 def post_comment(
     post_id: int,
     content,
@@ -100,7 +100,7 @@ def post_comment(
     return create_comment_application(post_id, content, session, current_user)
 
 
-@router.get("{post_id}/comments", response_model=list[CommentPublicModel])
+@router.get("/{post_id}/comments", response_model=list[CommentPublicModel])
 def get_comment(
     post_id: int,
     session: SessionDep,
@@ -109,7 +109,7 @@ def get_comment(
     return list_comments_application(post_id, session, current_user)
 
 
-@router.put("{post_id}/comments/{comment_id}/", response_model=CommentUpdateModel)
+@router.put("/{post_id}/comments/{comment_id}/", response_model=CommentUpdateModel)
 def comment_update(
     post_id,
     content,
@@ -123,7 +123,7 @@ def comment_update(
 
 
 @router.delete(
-    "{post_id}/comments/{comment_id}/delete/", status_code=status.HTTP_200_OK
+    "/{post_id}/comments/{comment_id}/delete/", status_code=status.HTTP_200_OK
 )
 def delete_comment(
     post_id,
@@ -134,7 +134,7 @@ def delete_comment(
     return delete_comment_application(post_id, comment_id, session, current_user)
 
 
-@router.post("{post_id}/like")
+@router.post("/{post_id}/like")
 def like_post(
     post_id, session: SessionDep, current_user: Users = Depends(get_current_user)
 ):

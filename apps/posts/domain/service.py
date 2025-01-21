@@ -189,7 +189,12 @@ def create_comment_instance(
     """
     Domain layer service for creating comment
     """
+    query = select(Posts).where(Posts.id == post_id)
+    post: Posts = session.exec(query).first()
 
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
     comment = Comments(post=post_id, content=content, comment_by=current_user.username)
     session.add(comment)
     session.commit()
@@ -205,7 +210,12 @@ def list_comments_instance(
     """
     Domain layer service for listing comments
     """
+    query = select(Posts).where(Posts.id == post_id)
+    post: Posts = session.exec(query).first()
 
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
     query = select(Comments).where(Comments.post == post_id)
     comments = session.exec(query).all()
 
@@ -225,6 +235,17 @@ def update_comment_instance(
     """
     Domain layer service for updating comment
     """
+    query = select(Posts).where(Posts.id == post_id)
+    post: Posts = session.exec(query).first()
+
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    query = select(Comments).where(Comments.id == comment_id)
+    comment: Comments = session.exec(query).first()
+
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
 
     query = select(Comments).where(
         Comments.post == post_id,
