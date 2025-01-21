@@ -47,3 +47,19 @@ class Connections(SQLModel, table=True):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = Field(default=True)
+
+
+# class Subscription(SQLModel, table=True):
+#     id: Optional[int] = Field(default=None, primary_key=True)
+#     subscription_type: bool | None = Field(default=None)
+#     expiration_at: str | None = Field(default=None)
+#     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
+#     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
+#     is_active: bool = Field(default=True)
+
+
+# class Transactions(SQLModel, table=True):
+#     id: Optional[int] = Field(default=None, primary_key=True)
+#     transaction_id: str
+#     username: str
+#     transaction_status: str

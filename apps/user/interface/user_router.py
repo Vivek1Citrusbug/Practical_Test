@@ -219,6 +219,17 @@ async def get_following(
     return await get_following_application(session, current_user)
 
 
+
+
+
+
+
+
+
+
+
+
+
 @router.post("/create-checkout-session")
 async def checkout(amount: int, session: SessionDep):
     if amount != 500:
