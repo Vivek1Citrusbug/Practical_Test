@@ -46,10 +46,9 @@ def list_posts(
     current_user: Users = Depends(get_current_user),
     skip: int = 0,
     limit: int = 10,
-    post_id: int = None,
     username: str = None,
 ):
-    return list_posts_application(session,current_user, skip, limit, post_id, username)
+    return list_posts_application(session,current_user, skip, limit, username)
 
 
 @router.get("/recommended_posts/", response_model=List[PostPublicModel])

@@ -20,7 +20,7 @@ from apps.user.application.schemas import (
     UserCreateModel,
     UserPublicModel,
 )
-
+from apps.user.dependency import ConnectionResponse
 from datetime import datetime, timedelta, timezone
 from config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -55,6 +55,7 @@ from apps.user.application.service import (
     get_followers_application,
     get_following_application,
     unfollow_user_application,
+    remove_follower_application,
 )
 from fastapi import status
 
@@ -174,7 +175,7 @@ async def create_follow_request(
     return await create_connection_application(username, session, current_user)
 
 
-@router.post("/connection/", tags=["Connections"])
+@router.post("/connection/unfollow/", tags=["Connections"])
 async def unfollow_user(
     username: str,
     session: SessionDep,
@@ -194,7 +195,7 @@ async def follow_requests(
 @router.post("/connection/request/status", tags=["Connections"])
 async def handle_requests(
     username: str,
-    response: str,
+    response: ConnectionResponse,
     session: SessionDep,
     current_user: Users = Depends(get_current_user),
 ):
@@ -219,15 +220,13 @@ async def get_following(
     return await get_following_application(session, current_user)
 
 
-
-
-
-
-
-
-
-
-
+@router.delete("/connection/remove_follower/", tags=["Connections"])
+async def remove_follower(
+    username: str, session: SessionDep, current_user: Users = Depends(get_current_user)
+):
+    return await remove_follower_application(
+        username=username, session=session, current_user=current_user
+    )
 
 
 @router.post("/create-checkout-session")

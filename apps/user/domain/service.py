@@ -30,6 +30,7 @@ from apps.user.dependency import (
     verify_reset_token,
 )
 import jwt
+from apps.user.dependency import ConnectionResponse
 from database import SessionDep
 from fastapi import Depends
 from typing import Annotated
@@ -456,7 +457,7 @@ async def get_connection_requests_instance(session: SessionDep, current_user: Us
 
 
 async def handle_connection_requests_instance(
-    username: str, response: str, session: SessionDep, current_user: Users
+    username: str, response: ConnectionResponse, session: SessionDep, current_user: Users
 ):
     """
     Domain layer service for handling connection requests.
@@ -470,13 +471,13 @@ async def handle_connection_requests_instance(
     if not connection_requests:
         raise HTTPException(status_code=404, detail="Connection request not found")
     else:
-        if response.lower() == "accept":
+        if response.value == "accept":
             print("Request accepted")
             connection_requests.status = 1
             session.commit()
             session.refresh(connection_requests)
             return {"message": "request accepted"}
-        elif response.lower() == "reject":
+        elif response.value == "reject":
             print("Request rejected")
             connection_requests.status = 0
             session.commit()
@@ -540,6 +541,27 @@ async def unfollow_user_instance(
     return {"message": f"You unfollowed {username}"}
 
 
+async def remove_follower_instance(username:str,session:SessionDep,current_user:Users):
+    """
+    Domain layer service for remioving follower
+    """
+    
+    query = select(Connections).where(
+        Connections.follower == username,
+        Connections.following == current_user.username,
+        Connections.status == 1,
+    )
+
+    result = session.exec(query).first()
+
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Follower not found")
+    
+    session.delete(result)
+    session.commit()
+    return {"message": f"You removed {username}"}
+
+    
 async def create_default_superuser():
     with Session(engine) as session:
         statement = select(Users).where(
@@ -571,3 +593,5 @@ async def create_default_superuser():
         )
         session.add(superuser)
         session.commit()
+
+

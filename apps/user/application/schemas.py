@@ -57,3 +57,5 @@ class TokenData(SQLModel):
 
 class PasswordResetRequest(BaseModel):
     email: EmailStr
+
+

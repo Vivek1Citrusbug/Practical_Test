@@ -19,8 +19,10 @@ from apps.user.domain.service import (
     get_followers_instance,
     get_following_instance,
     unfollow_user_instance,
+    remove_follower_instance,
 )
 from database import SessionDep
+from apps.user.dependency import ConnectionResponse
 
 
 async def register_user(user_data: UserCreateModel, session: Session):
@@ -126,7 +128,7 @@ async def get_connection_requests_application(
 
 async def handle_connection_requests_application(
     username: str,
-    response: str,
+    response: ConnectionResponse,
     session: SessionDep,
     current_user: Users,
 ):
@@ -171,3 +173,13 @@ async def unfollow_user_application(
     """
 
     return await unfollow_user_instance(username, session, current_user)
+
+
+async def remove_follower_application(
+    username: str, session: SessionDep, current_user: Users
+):
+    """
+    Application layer service for removing user
+    """
+
+    return await remove_follower_instance(username, session, current_user)

@@ -6,8 +6,24 @@ from apps.posts.domain.models import Posts, Likes, Comments, ReportedPosts
 from database import SessionDep
 from fastapi import FastAPI, HTTPException, UploadFile, Form, Depends, APIRouter, status
 from apps.user.domain.service import get_current_user
-from apps.user.domain.models import Users
+from apps.user.domain.models import Users, Connections, Profile
 from apps.posts.dependency import upload_to_minio
+
+
+def get_followers(session: SessionDep, current_user: Users):
+
+    query = select(Connections.following).where(
+        Connections.follower == current_user.username, Connections.status == 1
+    )
+
+    followings = [conn for conn in session.exec(query).all()]
+
+    query = select(Profile.username).where(Profile.is_private_account == 0)
+    public_accounts = [profile for profile in session.exec(query).all()]
+
+    valid_usernames = list(set(followings + public_accounts))
+
+    return valid_usernames
 
 
 def create_post_instance(
@@ -58,19 +74,24 @@ def list_posts_instance(
     current_user: Users,
     skip: int = 0,
     limit: int = 10,
-    post_id: int = None,
     username: str = None,
 ):
     """
     Domain layer service for listing posts
     """
 
-    query = select(Posts).offset(skip).limit(limit)
-    if username:
-        query = query.where(Posts.post_by.contains(username))
+    followings = get_followers(session, current_user)
+    followings.append(current_user.username)
 
-    if post_id:
-        query = query.where(Posts.id.contains(post_id))
+    query = select(Posts).order_by(Posts.created_at.desc())
+
+    if username:
+        query = query.where(Posts.post_by == username)
+    else:
+        query = query.where(Posts.post_by.in_(followings))
+
+    query = query.offset(skip).limit(limit)
+
     return session.exec(query).all()
 
 
@@ -171,9 +192,18 @@ def report_post_instance(
             detail="You are not authorized to perform this task.",
         )
 
+    followings = get_followers(session, current_user)
+
+    if post.post_by not in followings:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found",
+        )
+
     reporting_post = ReportedPosts(
         post=post.id, post_by=post.post_by, reported_by=current_user.username
     )
+
     session.add(reporting_post)
     session.commit()
     session.refresh(reporting_post)
@@ -189,13 +219,21 @@ def create_comment_instance(
     """
     Domain layer service for creating comment
     """
+
     query = select(Posts).where(Posts.id == post_id)
     post: Posts = session.exec(query).first()
 
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    
+
+    followings = get_followers(session, current_user)
+    followings.append(current_user.username)
+
+    if post.post_by not in followings:
+        raise HTTPException(status_code=404, detail="Post not found")
+
     comment = Comments(post=post_id, content=content, comment_by=current_user.username)
+
     session.add(comment)
     session.commit()
     session.refresh(comment)
@@ -215,7 +253,13 @@ def list_comments_instance(
 
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    
+
+    followings = get_followers(session, current_user)
+    followings.append(current_user.username)
+
+    if post.post_by not in followings:
+        raise HTTPException(status_code=404, detail="Post not found")
+
     query = select(Comments).where(Comments.post == post_id)
     comments = session.exec(query).all()
 
@@ -240,12 +284,12 @@ def update_comment_instance(
 
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    
-    query = select(Comments).where(Comments.id == comment_id)
-    comment: Comments = session.exec(query).first()
 
-    if not comment:
-        raise HTTPException(status_code=404, detail="Comment not found")
+    followings = get_followers(session, current_user)
+    followings.append(current_user.username)
+
+    if post.post_by not in followings:
+        raise HTTPException(status_code=404, detail="Post not found")
 
     query = select(Comments).where(
         Comments.post == post_id,
@@ -253,6 +297,10 @@ def update_comment_instance(
         Comments.comment_by == current_user.username,
     )
     comment = session.exec(query).first()
+
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
     comment.content = content if content else comment.content
     comment.modified_at = datetime.now(timezone.utc)
     session.commit()
@@ -269,11 +317,25 @@ def delete_comment_instance(
     Domain layer service for deleting comment
     """
 
+    query = select(Posts).where(Posts.id == post_id)
+    post: Posts = session.exec(query).first()
+
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    followings = get_followers(session, current_user)
+    followings.append(current_user.username)
+
+    if post.post_by not in followings:
+        raise HTTPException(status_code=404, detail="Post not found")
+
     query = select(Comments).where(
         Comments.post == post_id,
         Comments.id == comment_id,
     )
+
     comment = session.exec(query).first()
+
     if comment.comment_by != current_user.username and not (
         current_user.is_staff or current_user.is_superuser
     ):
@@ -295,13 +357,22 @@ def create_like_instance(
     Domain layer service for creating like
     """
 
-    post = session.get(Posts, post_id)
+    query = select(Posts).where(Posts.id == post_id)
+    post: Posts = session.exec(query).first()
+
     if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    followings = get_followers(session, current_user)
+    followings.append(current_user.username)
+
+    if post.post_by not in followings:
         raise HTTPException(status_code=404, detail="Post not found")
 
     query = select(Likes).where(
         (Likes.post == post_id) & (Likes.liked_by == current_user.username)
     )
+    
     existing_like = session.exec(query).first()
 
     if existing_like:
