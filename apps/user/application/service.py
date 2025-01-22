@@ -1,4 +1,4 @@
-from typing import Annotated, List,Optional
+from typing import Annotated, List, Optional
 
 from fastapi import Depends, UploadFile
 from database import Session
@@ -80,7 +80,9 @@ async def user_profile_update_application(
     Application layer service for updating user profile
     """
 
-    return await user_profile_update_instance(bio,is_private_account,session,files,current_user)
+    return await user_profile_update_instance(
+        bio, is_private_account, session, files, current_user
+    )
 
 
 async def user_profile_create_application(
@@ -89,14 +91,13 @@ async def user_profile_create_application(
     session: SessionDep,
     current_user: Users,
     files: Optional[List[UploadFile]] | None,
-    
 ):
     """
     Application layer service for creating user profile
     """
 
     return await user_profile_create_instance(
-        bio, is_private_account, session,files, current_user
+        bio, is_private_account, session, files, current_user
     )
 
 

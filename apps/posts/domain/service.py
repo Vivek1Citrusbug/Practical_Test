@@ -143,7 +143,7 @@ def update_post_instance(
     post.content = content if content else post.content
     post.file_url = file_url if file_url else post.file_url
     session.commit()
-
+    post.modified_at=datetime.now(timezone.utc)
     return post
 
 

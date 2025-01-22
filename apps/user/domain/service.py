@@ -254,6 +254,7 @@ async def password_reset_instance(session: SessionDep, user: str):
 
     token = create_reset_token(current_user.email)
     current_user.password_reset_token = token
+    current_user.modified_at = datetime.now(timezone.utc)
     reset_link = RESET_LINK + token
     session.add(current_user)
     session.commit()
@@ -281,6 +282,7 @@ async def password_reset_confirm_instance(
     current_user.password = get_password_hash(new_password)
     session.add(current_user)
     session.commit()
+    current_user.modified_at = datetime.now(timezone.utc)
     return {"message": "Password has been reset successfully"}
 
 
@@ -428,7 +430,7 @@ async def create_connection_instance(
     if username == current_user.username:
         raise HTTPException(
             status_code=400,
-            detail="Bad Request",
+            detail="User can not sent request to themselves",
         )
 
     user = session.exec(select(Users).where(Users.username == username)).first()
@@ -467,6 +469,7 @@ async def create_connection_instance(
         connection_instance.status = 2 if profile.is_private_account else 1
         session.commit()
         session.refresh(connection_instance)
+        connection_instance.modified_at=datetime.now(timezone.utc)
         return {
             "message": (
                 "Connection request sent"
@@ -479,6 +482,7 @@ async def create_connection_instance(
         connection_instance.status = 0
         session.commit()
         session.refresh(connection_instance)
+        connection_instance.modified_at=datetime.now(timezone.utc)
         return {"message": "Connection request withdrawn"}
 
     return {"message": "User is already connected or followed"}
@@ -519,12 +523,14 @@ async def handle_connection_requests_instance(
             connection_requests.status = 1
             session.commit()
             session.refresh(connection_requests)
+            connection_requests.modified_at=datetime.now(timezone.utc)
             return {"message": "request accepted"}
         elif response.value == "reject":
             print("Request rejected")
             connection_requests.status = 0
             session.commit()
             session.refresh(connection_requests)
+            connection_requests.modified_at=datetime.now(timezone.utc)
             return {"message": "request rejected"}
         else:
             return {"message": "Invalid response"}
@@ -581,6 +587,7 @@ async def unfollow_user_instance(
     following.status = 0
     session.commit()
     session.refresh(following)
+    following.modified_at=datetime.now(timezone.utc)
     return {"message": f"You unfollowed {username}"}
 
 
@@ -602,6 +609,7 @@ async def remove_follower_instance(username:str,session:SessionDep,current_user:
     
     session.delete(result)
     session.commit()
+    result.modified_at=datetime.now(timezone.utc)
     return {"message": f"You removed {username}"}
 
     
