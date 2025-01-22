@@ -45,6 +45,7 @@ from jwt.exceptions import InvalidTokenError
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import ssl
+import json
 
 # Disable SSL verification (not recommended for production)
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -373,7 +374,7 @@ async def user_profile_create_instance(
 
     new_profile = Profile(
         bio=bio,
-        profile_picture=file_urls,
+        profile_picture=json.dumps(file_urls),
         is_private_account=is_private_account,
         username=current_user.username,
     )

@@ -57,7 +57,7 @@ from apps.user.application.service import (
     unfollow_user_application,
     remove_follower_application,
 )
-from fastapi import status
+from fastapi import status,File
 
 router = APIRouter()
 
@@ -128,10 +128,43 @@ async def password_reset_confirm(
     return await password_reset_confirm_application(new_password, session, current_user)
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 @router.post("/profiles/", response_model=UserProfilePublic, tags=["Profile"])
 async def create_profile(
     session: SessionDep,
-    file: list[UploadFile] | None,
+    file: list[UploadFile] | None = File(...),
     bio: str = Form(...),
     is_private_account: bool = Form(...),
     current_user: Users = Depends(get_current_user),
@@ -162,6 +195,42 @@ async def delete_profile(
 ):
 
     return await user_profile_delete_application(username, session, current_user)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 @router.post("/connection/{username}/", tags=["Connections"])
@@ -225,6 +294,32 @@ async def remove_follower(
     return await remove_follower_application(
         username=username, session=session, current_user=current_user
     )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 @router.post("/create-checkout-session")
