@@ -245,10 +245,12 @@ def mail_service(to_email: str, reset_link: str, session: SessionDep):
         print(f"Error sending email: {e}")
 
 
-async def password_reset_instance(session: SessionDep, current_user: Users):
+async def password_reset_instance(session: SessionDep, user: str):
     """
     Service for Creating reset password token
     """
+    statement = select(Users).where(Users.username == user)
+    current_user = session.exec(statement).first()
 
     token = create_reset_token(current_user.email)
     current_user.password_reset_token = token
@@ -264,11 +266,13 @@ async def password_reset_instance(session: SessionDep, current_user: Users):
 
 
 async def password_reset_confirm_instance(
-    new_password: str, session: SessionDep, current_user: Users
+    new_password: str, session: SessionDep, user: str
 ):
     """
     Service for Creating reset password token
     """
+    statement = select(Users).where(Users.username == user)
+    current_user:Users = session.exec(statement).first()
 
     email = verify_reset_token(current_user.password_reset_token)
     if email is None:

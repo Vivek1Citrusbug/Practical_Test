@@ -110,22 +110,24 @@ async def github_callback(code: str, session: SessionDep):
     return await github_callback_application(code, session)
 
 
-@router.post("/password-reset/", tags=["Users"])
+@router.post("/password-reset/{username}/", tags=["Users"])
 async def password_reset_request(
     session: SessionDep,
-    current_user: Users = Depends(get_current_user),
+    # current_user: Users = Depends(get_current_user),
+    username:str
 ):
-    return await password_reset_application(session, current_user)
+    return await password_reset_application(session, username)
 
 
-@router.post("/password-reset/confirm/", tags=["Users"])
+@router.post("/password-reset/confirm/{username}/", tags=["Users"])
 async def password_reset_confirm(
     new_password: str,
     session: SessionDep,
-    current_user: Users = Depends(get_current_user),
+    username:str,
+    # current_user: Users = Depends(get_current_user),
 ):
 
-    return await password_reset_confirm_application(new_password, session, current_user)
+    return await password_reset_confirm_application(new_password, session, username)
 
 
 @router.post("/profiles/", response_model=UserProfilePublic, tags=["Profile"])

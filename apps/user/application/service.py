@@ -41,22 +41,22 @@ async def github_callback_application(code: str, session: SessionDep):
     return await github_callback_instance(code, session)
 
 
-async def password_reset_application(session: SessionDep, current_user: Users):
+async def password_reset_application(session: SessionDep, user: str):
     """
     Application layer service generating reset password token
     """
 
-    return await password_reset_instance(session, current_user)
+    return await password_reset_instance(session, user)
 
 
 async def password_reset_confirm_application(
-    new_password: str, session: SessionDep, current_user: Users
+    new_password: str, session: SessionDep, user: str
 ):
     """
     Application layer service generating reset password token
     """
 
-    return await password_reset_confirm_instance(new_password, session, current_user)
+    return await password_reset_confirm_instance(new_password, session, user)
 
 
 async def user_profile_delete_application(
