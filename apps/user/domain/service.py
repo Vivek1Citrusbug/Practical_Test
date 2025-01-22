@@ -647,6 +647,7 @@ async def create_default_superuser():
         session.add(superuser)
         session.commit()
 
+
 async def remove_profile_data(user_profile:Profile):
     """
     Service for deleting profile data from remote cloud storage

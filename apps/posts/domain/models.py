@@ -21,7 +21,7 @@ class Posts(PostBase, table=True):
     is_active: bool = Field(default=True)
 
     # Relationship with ReportedPosts
-    reported_posts: list["ReportedPosts"] = Relationship(back_populates="post_model")
+    reported_posts: list["ReportedPosts"] = Relationship(back_populates="post_model", cascade_delete=True)
 
 
 class ReportedPosts(SQLModel, table=True):
