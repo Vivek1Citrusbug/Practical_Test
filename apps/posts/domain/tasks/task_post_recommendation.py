@@ -2,54 +2,34 @@
 ######## Recurring task for giving recommendation to user for everyday at 10:00 AM UST #######
 ##############################################################################################
 
-from apps.posts.domain.tasks.celery_app import app
+from tasks.celery_app import app
 from email.message import EmailMessage
-from config import (
-    FROM_EMAIL,
-    SENDGRID_POST_RECOMMENDATION_API_KEY,
-    SENDGRID_TEMPLATE_POST_RECOMMENDATION
-)
+from config import SENDGRID_POST_RECOMMENDATION_API_KEY,FROM_EMAIL,SENDGRID_TEMPLATE_POST_RECOMMENDATION
 from sendgrid.helpers.mail import Mail
 from datetime import datetime
 from sendgrid import SendGridAPIClient
+from apps.posts.domain.models import Posts
+from apps.posts.domain.service import list_recommended_posts_instance
+from database import SessionDep
+from apps.user.domain.service import get_current_user
 
-
-@celery_app.task
-def send_recommended_posts_email(user_email: str, posts: list):
-    # Format the email content
-    subject = "Your Daily Recommended Posts"
-    body = "Here are your recommended posts:\n\n" + "\n".join(posts)
-
-    # Use an email library to send the email
-    send_email(to=user_email, subject=subject, body=body)
-
-    return f"Email sent to {user_email} at {datetime.utcnow()}"
-
-
-@app.task
-def send_post_removal_email(
+@app.task(name="tasks.send_recommendation_email")
+def send_post_recommendation_email(
     user_email: str,
-    user_name: str,
-    post_title: str,
-    removal_reason: str | None = None,
-    support_url: str | None = None,
+    session:SessionDep
 ):
     """
-    Dependency function to send email notification to user regarding their post removal
+    Celery function to send email notification to user regarding their post removal
     """
 
+    recommended_posts = list_recommended_posts_instance(session)
     message = Mail(
         from_email=FROM_EMAIL,
         to_emails=user_email,
         subject="Your Daily Recommended Posts",
     )
-    current_year = datetime.now().year
     message.dynamic_template_data = {
-        "user_name": user_name,
-        "post_title": post_title,
-        "removal_reason": removal_reason,
-        "support_url": support_url,
-        "current_year": current_year,
+        "posts": recommended_posts,
     }
     message.template_id = SENDGRID_TEMPLATE_POST_RECOMMENDATION
     try:
@@ -62,13 +42,3 @@ def send_post_removal_email(
         print(f"Error sending email: {e}")
 
 
-# Configure periodic tasks
-app.conf.beat_schedule = {
-    "run-periodic-task-every-20-seconds": {
-        "task": "tasks.task_2_celery.send_email_celery",
-        "schedule": 20.0,
-        "args": (),
-    },
-}
-
-app.conf.timezone = "Asia/Kolkata"
