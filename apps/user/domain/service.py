@@ -33,7 +33,7 @@ import jwt
 from apps.user.dependency import ConnectionResponse
 from database import SessionDep
 from fastapi import Depends
-from typing import Annotated, List
+from typing import Annotated, List,Optional
 from database import Session
 from apps.user.application.schemas import UserCreateModel, UserProfileCreate
 from apps.user.domain.models import Users, Profile, Connections
@@ -305,8 +305,8 @@ async def user_profile_delete_instance(
 async def user_profile_update_instance(
     bio:str,
     is_private_account:bool,
-    file: UploadFile | None,
     session: SessionDep, 
+    files:  Optional[List[UploadFile]],  
     current_user: Users
 ):
     """
@@ -314,20 +314,42 @@ async def user_profile_update_instance(
     """
 
     profile = session.exec(select(Profile).where(Profile.username == current_user.username)).first()
+    
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
     profile.bio = bio if bio is not None else profile.bio
+    allowed_extensions = {"jpg", "jpeg", "png", "gif", "mp4", "mkv", "avi", "mov"} 
+    file_urls = []
+    
+    if files:
+        for file in files:
+            file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
+            
+            if file_extension not in allowed_extensions:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unsupported file type: {file.filename}. Allowed types: {', '.join(allowed_extensions)}"
+                )
+
+        
+            file_bytes = await file.read()  
+            file_url = upload_to_minio(file_bytes, str(uuid.uuid4()) + "." + file_extension)
+            file_urls.append(file_url)
+
+
     profile.profile_picture = (
-        file
-        if file is not None
+        json.dumps(file_urls)
+        if file_urls is not None
         else profile.profile_picture
     )
+    
     profile.is_private_account = (
         is_private_account
         if is_private_account is not None
         else profile.is_private_account
     )
+    
     profile.modified_at = datetime.now(timezone.utc)
 
     session.add(profile)
@@ -339,7 +361,7 @@ async def user_profile_create_instance(
     bio: str,
     is_private_account: bool,
     session: SessionDep,
-    files: List[UploadFile],  
+    files:  Optional[List[UploadFile]],  
     current_user: Users,
 ):
     """
@@ -355,22 +377,23 @@ async def user_profile_create_instance(
     if existing_profile:
         raise HTTPException(status_code=400, detail="User already has a profile")
 
-    allowed_extensions = {"jpg", "jpeg", "png", "gif", "mp4", "mkv", "avi", "mov"}  
+    allowed_extensions = {"jpg", "jpeg", "png", "gif", "mp4", "mkv", "avi", "mov"} 
+
     file_urls = []
+    if files:
+        for file in files:
+            file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
+            
+            if file_extension not in allowed_extensions:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unsupported file type: {file.filename}. Allowed types: {', '.join(allowed_extensions)}"
+                )
 
-    for file in files:
-        file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
         
-        if file_extension not in allowed_extensions:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported file type: {file.filename}. Allowed types: {', '.join(allowed_extensions)}"
-            )
-
-       
-        file_bytes = await file.read()  
-        file_url = upload_to_minio(file_bytes, str(uuid.uuid4()) + "." + file_extension)
-        file_urls.append(file_url)
+            file_bytes = await file.read()  
+            file_url = upload_to_minio(file_bytes, str(uuid.uuid4()) + "." + file_extension)
+            file_urls.append(file_url)
 
     new_profile = Profile(
         bio=bio,

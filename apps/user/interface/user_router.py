@@ -2,7 +2,7 @@ import httpx
 import stripe
 from fastapi.responses import RedirectResponse
 import jwt
-from typing import Annotated
+from typing import Annotated,Optional
 from fastapi import (
     APIRouter,
     Depends,
@@ -164,7 +164,7 @@ async def password_reset_confirm(
 @router.post("/profiles/", response_model=UserProfilePublic, tags=["Profile"])
 async def create_profile(
     session: SessionDep,
-    file: list[UploadFile] | None = File(...),
+    file: Optional[list[UploadFile]] = File(None),
     bio: str = Form(...),
     is_private_account: bool = Form(...),
     current_user: Users = Depends(get_current_user),
@@ -182,7 +182,7 @@ async def get_profile(username: str, session: SessionDep):
 
 
 @router.put("/profiles/{username}", response_model=UserProfilePublic, tags=["Profile"])
-async def update_profile(bio: str | None,is_private_account: bool | None,session: SessionDep,file:UploadFile | None,current_user: Users = Depends(get_current_user),
+async def update_profile(bio: str | None,is_private_account: bool | None,session: SessionDep,file: Optional[list[UploadFile]] = File(None),current_user: Users = Depends(get_current_user),
 ):
     return await user_profile_update_application(bio,is_private_account,session,file,current_user)
 
