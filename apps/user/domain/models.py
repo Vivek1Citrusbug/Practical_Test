@@ -3,7 +3,7 @@ from sqlmodel import Field, SQLModel, Relationship
 from datetime import datetime, timezone
 from typing import Optional, TYPE_CHECKING
 from apps.posts.domain.models import Posts
-
+from pydantic import EmailStr
 
 #############################
 ##### Database model ########
@@ -11,7 +11,7 @@ from apps.posts.domain.models import Posts
 
 
 class Users(UserBaseModel, table=True):
-    email: str = Field(default=None, primary_key=True)
+    email:EmailStr = Field(default=None, primary_key=True)
     password: str
     password_reset_token: str = Field(default="")
     is_verified: bool = Field(default=False)
@@ -46,4 +46,20 @@ class Connections(SQLModel, table=True):
     status: int  # status: 0 - rejected, 1 - accepted, 2 - pending
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
-    is_active: bool = Field(default=True)
+    is_active: bool = Field(default=True) 
+
+
+# class Subscription(SQLModel, table=True):
+#     id: Optional[int] = Field(default=None, primary_key=True)
+#     subscription_type: bool | None = Field(default=None)
+#     expiration_at: str | None = Field(default=None)
+#     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
+#     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
+#     is_active: bool = Field(default=True)
+
+
+# class Transactions(SQLModel, table=True):
+#     id: Optional[int] = Field(default=None, primary_key=True)
+#     transaction_id: str
+#     username: str
+#     transaction_status: str

@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, List
 
 from fastapi import Depends, UploadFile
 from database import Session
@@ -19,8 +19,10 @@ from apps.user.domain.service import (
     get_followers_instance,
     get_following_instance,
     unfollow_user_instance,
+    remove_follower_instance,
 )
 from database import SessionDep
+from apps.user.dependency import ConnectionResponse
 
 
 async def register_user(user_data: UserCreateModel, session: Session):
@@ -68,13 +70,17 @@ async def user_profile_delete_application(
 
 
 async def user_profile_update_application(
-    profile_data: UserProfileCreate, session: SessionDep, current_user: Users
+    bio: str | None,
+    is_private_account: bool | None,
+    session: SessionDep,
+    file:UploadFile | None ,
+    current_user: Users,
 ):
     """
     Application layer service for updating user profile
     """
 
-    return await user_profile_update_instance(profile_data, session, current_user)
+    return await user_profile_update_instance(bio,is_private_account,session,file,current_user)
 
 
 async def user_profile_create_application(
@@ -82,14 +88,15 @@ async def user_profile_create_application(
     is_private_account: bool,
     session: SessionDep,
     current_user: Users,
-    file: UploadFile | None,
+    files: List[UploadFile] | None,
+    
 ):
     """
     Application layer service for creating user profile
     """
 
     return await user_profile_create_instance(
-        bio, is_private_account, session, current_user, file
+        bio, is_private_account, session,files, current_user
     )
 
 
@@ -126,7 +133,7 @@ async def get_connection_requests_application(
 
 async def handle_connection_requests_application(
     username: str,
-    response: str,
+    response: ConnectionResponse,
     session: SessionDep,
     current_user: Users,
 ):
@@ -171,3 +178,13 @@ async def unfollow_user_application(
     """
 
     return await unfollow_user_instance(username, session, current_user)
+
+
+async def remove_follower_application(
+    username: str, session: SessionDep, current_user: Users
+):
+    """
+    Application layer service for removing user
+    """
+
+    return await remove_follower_instance(username, session, current_user)

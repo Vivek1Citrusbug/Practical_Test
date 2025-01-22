@@ -20,7 +20,7 @@ from apps.user.application.schemas import (
     UserCreateModel,
     UserPublicModel,
 )
-
+from apps.user.dependency import ConnectionResponse
 from datetime import datetime, timedelta, timezone
 from config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -55,6 +55,7 @@ from apps.user.application.service import (
     get_followers_application,
     get_following_application,
     unfollow_user_application,
+    remove_follower_application,
 )
 from fastapi import status
 
@@ -130,14 +131,15 @@ async def password_reset_confirm(
 @router.post("/profiles/", response_model=UserProfilePublic, tags=["Profile"])
 async def create_profile(
     session: SessionDep,
+    file: list[UploadFile] | None,
     bio: str = Form(...),
     is_private_account: bool = Form(...),
     current_user: Users = Depends(get_current_user),
-    file: UploadFile | None = None,
+    
 ):
 
     return await user_profile_create_application(
-        bio, is_private_account, session, current_user, file
+        bio, is_private_account, session, current_user,file
     )
 
 
@@ -147,12 +149,9 @@ async def get_profile(username: str, session: SessionDep):
 
 
 @router.put("/profiles/{username}", response_model=UserProfilePublic, tags=["Profile"])
-async def update_profile(
-    profile_data: UserProfileCreate,
-    session: SessionDep,
-    current_user: Users = Depends(get_current_user),
+async def update_profile(bio: str | None,is_private_account: bool | None,session: SessionDep,file:UploadFile | None,current_user: Users = Depends(get_current_user),
 ):
-    return await user_profile_update_application(profile_data, session, current_user)
+    return await user_profile_update_application(bio,is_private_account,session,file,current_user)
 
 
 @router.delete("/profiles/{username}", tags=["Profile"])
@@ -174,7 +173,7 @@ async def create_follow_request(
     return await create_connection_application(username, session, current_user)
 
 
-@router.post("/connection/", tags=["Connections"])
+@router.post("/connection/unfollow/", tags=["Connections"])
 async def unfollow_user(
     username: str,
     session: SessionDep,
@@ -194,7 +193,7 @@ async def follow_requests(
 @router.post("/connection/request/status", tags=["Connections"])
 async def handle_requests(
     username: str,
-    response: str,
+    response: ConnectionResponse,
     session: SessionDep,
     current_user: Users = Depends(get_current_user),
 ):
@@ -217,6 +216,15 @@ async def get_following(
     current_user: Users = Depends(get_current_user),
 ):
     return await get_following_application(session, current_user)
+
+
+@router.delete("/connection/remove_follower/", tags=["Connections"])
+async def remove_follower(
+    username: str, session: SessionDep, current_user: Users = Depends(get_current_user)
+):
+    return await remove_follower_application(
+        username=username, session=session, current_user=current_user
+    )
 
 
 @router.post("/create-checkout-session")

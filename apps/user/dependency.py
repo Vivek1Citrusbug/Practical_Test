@@ -19,6 +19,7 @@ from config import (
     MINIO_PROFILE_PICTURE_BUCKET,
     MINIO_POST_FILE_BUCKET,
 )
+from enum import Enum
 
 s3 = boto3.client(
     "s3",
@@ -86,3 +87,6 @@ def upload_to_minio(file: bytes, filename: str):
         return f"Error uploading file: {str(e)}"
 
 
+class ConnectionResponse(Enum):
+    ACCEPT = "accept"
+    REJECT = "reject"

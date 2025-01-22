@@ -36,14 +36,13 @@ def list_posts_application(
     current_user: Users,
     skip: int = 0,
     limit: int = 10,
-    post_id: int = None,
     username: str = None,
 ):
     """
     Application layer service for listing posts
     """
 
-    return list_posts_instance(session,current_user, skip, limit, post_id, username)
+    return list_posts_instance(session,current_user, skip, limit, username)
 
 def list_recommended_posts_application(
     session: SessionDep,

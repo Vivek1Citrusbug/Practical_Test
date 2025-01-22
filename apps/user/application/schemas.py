@@ -18,23 +18,23 @@ class UserBaseModel(SQLModel):
 
 class UserPublicModel(SQLModel):
     username: str
-    email: str
+    email: EmailStr
     name: str | None = Field(default=None)
     first_name: str | None = Field(default=None)
     last_name: str | None = Field(default=None)
 
 
 class UserCreateModel(SQLModel):
-    username: str
-    name: str
-    first_name: str
-    last_name: str
-    email: str
-    password: str
+    username: str = Field(max_length=20,min_length=5, schema_extra={'pattern': r'^[a-zA-Z0-9]+$'})
+    name: str = Field(max_length=20,min_length=5, schema_extra={'pattern': r"^[a-zA-Z\s]+$"})
+    first_name: str = Field(max_length=20,min_length=5,schema_extra={'pattern': r"^[a-zA-Z]+$"})
+    last_name: str = Field(max_length=20,min_length=5,schema_extra={'pattern': r"^[a-zA-Z]+$"} )
+    email: EmailStr
+    password: str = Field(max_length=20,min_length=8,schema_extra={'pattern': r"^[A-Za-z0-9@#$%^&+=]{8,}"})
 
 
 class UserProfileCreate(SQLModel):
-    bio: str | None = Field(default=None)
+    bio: str | None = Field(default=None,max_length=30)
     is_private_account: bool
 
 
@@ -52,8 +52,10 @@ class Token(SQLModel):
 
 class TokenData(SQLModel):
     username: str
-    email: str | None = None
+    email: EmailStr | None = None
 
 
 class PasswordResetRequest(BaseModel):
     email: EmailStr
+
+
