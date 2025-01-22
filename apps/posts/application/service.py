@@ -49,7 +49,7 @@ def list_recommended_posts_application(
     current_user: Users,
 ):
     """Application layer service for listing recommended post to users"""
-    return list_recommended_posts_instance(session,current_user)
+    return list_recommended_posts_instance(session)
     
 
 def update_post_application(
