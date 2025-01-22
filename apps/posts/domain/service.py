@@ -8,6 +8,8 @@ from fastapi import FastAPI, HTTPException, UploadFile, Form, Depends, APIRouter
 from apps.user.domain.service import get_current_user
 from apps.user.domain.models import Users, Connections, Profile
 from apps.posts.dependency import upload_to_minio
+from apps.user.dependency import remove_object_from_minio
+from config import MINIO_POST_FILE_BUCKET
 
 
 def get_followers(session: SessionDep, current_user: Users):
@@ -143,7 +145,7 @@ def update_post_instance(
     post.content = content if content else post.content
     post.file_url = file_url if file_url else post.file_url
     session.commit()
-
+    post.modified_at = datetime.now(timezone.utc)
     return post
 
 
@@ -168,7 +170,24 @@ def delete_post_instance(
         )
     session.delete(post)
     session.commit()
+
+    remove_post_cloud_data(post)
     return {"detail": "Post deleted"}
+
+
+def remove_post_cloud_data(post: Posts):
+    """
+    Service to remove post objects from minio storage
+    """
+
+    try:
+        object_list = post.file_url
+        object_list = object_list.split("/")
+        results = []
+        results.append(object_list[-1])
+        remove_object_from_minio(MINIO_POST_FILE_BUCKET, results)
+    except Exception as e:
+        print(f"Error removing object: {str(e)}")
 
 
 def report_post_instance(
@@ -372,7 +391,7 @@ def create_like_instance(
     query = select(Likes).where(
         (Likes.post == post_id) & (Likes.liked_by == current_user.username)
     )
-    
+
     existing_like = session.exec(query).first()
 
     if existing_like:

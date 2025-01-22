@@ -1,7 +1,7 @@
 from apps.user.application.schemas import UserBaseModel
 from sqlmodel import Field, SQLModel, Relationship
 from datetime import datetime, timezone
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING,List
 from apps.posts.domain.models import Posts
 from pydantic import EmailStr
 
@@ -48,18 +48,3 @@ class Connections(SQLModel, table=True):
     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = Field(default=True) 
 
-
-# class Subscription(SQLModel, table=True):
-#     id: Optional[int] = Field(default=None, primary_key=True)
-#     subscription_type: bool | None = Field(default=None)
-#     expiration_at: str | None = Field(default=None)
-#     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
-#     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
-#     is_active: bool = Field(default=True)
-
-
-# class Transactions(SQLModel, table=True):
-#     id: Optional[int] = Field(default=None, primary_key=True)
-#     transaction_id: str
-#     username: str
-#     transaction_status: str

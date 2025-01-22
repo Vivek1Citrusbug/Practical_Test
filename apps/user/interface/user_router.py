@@ -2,7 +2,7 @@ import httpx
 import stripe
 from fastapi.responses import RedirectResponse
 import jwt
-from typing import Annotated
+from typing import Annotated, Optional
 from fastapi import (
     APIRouter,
     Depends,
@@ -57,7 +57,7 @@ from apps.user.application.service import (
     unfollow_user_application,
     remove_follower_application,
 )
-from fastapi import status
+from fastapi import status, File
 
 router = APIRouter()
 
@@ -110,48 +110,56 @@ async def github_callback(code: str, session: SessionDep):
     return await github_callback_application(code, session)
 
 
-@router.post("/password-reset/", tags=["Users"])
+@router.post("/password-reset/{username}/", tags=["Users"])
 async def password_reset_request(
     session: SessionDep,
-    current_user: Users = Depends(get_current_user),
+    # current_user: Users = Depends(get_current_user),
+    username:str
 ):
-    return await password_reset_application(session, current_user)
+    return await password_reset_application(session, username)
 
 
-@router.post("/password-reset/confirm/", tags=["Users"])
+@router.post("/password-reset/confirm/{username}/", tags=["Users"])
 async def password_reset_confirm(
     new_password: str,
     session: SessionDep,
-    current_user: Users = Depends(get_current_user),
+    username:str,
+    # current_user: Users = Depends(get_current_user),
 ):
 
-    return await password_reset_confirm_application(new_password, session, current_user)
+    return await password_reset_confirm_application(new_password, session, username)
 
 
 @router.post("/profiles/", response_model=UserProfilePublic, tags=["Profile"])
 async def create_profile(
     session: SessionDep,
-    file: list[UploadFile] | None,
+    file: Optional[list[UploadFile]] = File(None),
     bio: str = Form(...),
     is_private_account: bool = Form(...),
     current_user: Users = Depends(get_current_user),
-    
 ):
 
     return await user_profile_create_application(
-        bio, is_private_account, session, current_user,file
+        bio, is_private_account, session, current_user, file
     )
 
 
-@router.get("/profiles/{username}", response_model=UserProfilePublic, tags=["Profile"])
+@router.get("/profiles/{username}/", response_model=UserProfilePublic, tags=["Profile"])
 async def get_profile(username: str, session: SessionDep):
     return await user_profile_get_application(username, session)
 
 
-@router.put("/profiles/{username}", response_model=UserProfilePublic, tags=["Profile"])
-async def update_profile(bio: str | None,is_private_account: bool | None,session: SessionDep,file:UploadFile | None,current_user: Users = Depends(get_current_user),
+@router.put("/profiles/{username}/", response_model=UserProfilePublic, tags=["Profile"])
+async def update_profile(
+    bio: str | None,
+    is_private_account: bool | None,
+    session: SessionDep,
+    file: Optional[list[UploadFile]] = File(None),
+    current_user: Users = Depends(get_current_user),
 ):
-    return await user_profile_update_application(bio,is_private_account,session,file,current_user)
+    return await user_profile_update_application(
+        bio, is_private_account, session, file, current_user
+    )
 
 
 @router.delete("/profiles/{username}", tags=["Profile"])

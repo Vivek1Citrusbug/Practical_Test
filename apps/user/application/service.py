@@ -1,4 +1,4 @@
-from typing import Annotated, List
+from typing import Annotated, List, Optional
 
 from fastapi import Depends, UploadFile
 from database import Session
@@ -41,22 +41,22 @@ async def github_callback_application(code: str, session: SessionDep):
     return await github_callback_instance(code, session)
 
 
-async def password_reset_application(session: SessionDep, current_user: Users):
+async def password_reset_application(session: SessionDep, user: str):
     """
     Application layer service generating reset password token
     """
 
-    return await password_reset_instance(session, current_user)
+    return await password_reset_instance(session, user)
 
 
 async def password_reset_confirm_application(
-    new_password: str, session: SessionDep, current_user: Users
+    new_password: str, session: SessionDep, user: str
 ):
     """
     Application layer service generating reset password token
     """
 
-    return await password_reset_confirm_instance(new_password, session, current_user)
+    return await password_reset_confirm_instance(new_password, session, user)
 
 
 async def user_profile_delete_application(
@@ -73,14 +73,16 @@ async def user_profile_update_application(
     bio: str | None,
     is_private_account: bool | None,
     session: SessionDep,
-    file:UploadFile | None ,
+    files: Optional[List[UploadFile]] | None,
     current_user: Users,
 ):
     """
     Application layer service for updating user profile
     """
 
-    return await user_profile_update_instance(bio,is_private_account,session,file,current_user)
+    return await user_profile_update_instance(
+        bio, is_private_account, session, files, current_user
+    )
 
 
 async def user_profile_create_application(
@@ -88,15 +90,14 @@ async def user_profile_create_application(
     is_private_account: bool,
     session: SessionDep,
     current_user: Users,
-    files: List[UploadFile] | None,
-    
+    files: Optional[List[UploadFile]] | None,
 ):
     """
     Application layer service for creating user profile
     """
 
     return await user_profile_create_instance(
-        bio, is_private_account, session,files, current_user
+        bio, is_private_account, session, files, current_user
     )
 
 

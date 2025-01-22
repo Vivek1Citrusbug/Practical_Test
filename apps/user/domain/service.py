@@ -1,10 +1,10 @@
 import os
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone,UTC
 from fastapi import HTTPException, UploadFile, status
 import httpx
 from passlib.context import CryptContext
-from apps.user.dependency import upload_to_minio
+from apps.user.dependency import upload_to_minio,remove_object_from_minio
 from config import (
     ALGORITHM,
     GITHUB_CLIENT_ID,
@@ -22,6 +22,7 @@ from config import (
     ADMIN_LASTNAME,
     ADMIN_NAME,
     ADMIN_PASSWORD,
+    MINIO_PROFILE_PICTURE_BUCKET
 )
 from apps.user.dependency import (
     verify_password,
@@ -33,7 +34,7 @@ import jwt
 from apps.user.dependency import ConnectionResponse
 from database import SessionDep
 from fastapi import Depends
-from typing import Annotated, List
+from typing import Annotated, List,Optional
 from database import Session
 from apps.user.application.schemas import UserCreateModel, UserProfileCreate
 from apps.user.domain.models import Users, Profile, Connections
@@ -45,6 +46,9 @@ from jwt.exceptions import InvalidTokenError
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import ssl
+import json
+from apps.posts.domain.tasks.celery_app import app
+from celery.schedules import crontab
 
 # Disable SSL verification (not recommended for production)
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -244,13 +248,16 @@ def mail_service(to_email: str, reset_link: str, session: SessionDep):
         print(f"Error sending email: {e}")
 
 
-async def password_reset_instance(session: SessionDep, current_user: Users):
+async def password_reset_instance(session: SessionDep, user: str):
     """
     Service for Creating reset password token
     """
+    statement = select(Users).where(Users.username == user)
+    current_user = session.exec(statement).first()
 
     token = create_reset_token(current_user.email)
     current_user.password_reset_token = token
+    current_user.modified_at = datetime.now(timezone.utc)
     reset_link = RESET_LINK + token
     session.add(current_user)
     session.commit()
@@ -263,11 +270,13 @@ async def password_reset_instance(session: SessionDep, current_user: Users):
 
 
 async def password_reset_confirm_instance(
-    new_password: str, session: SessionDep, current_user: Users
+    new_password: str, session: SessionDep, user: str
 ):
     """
     Service for Creating reset password token
     """
+    statement = select(Users).where(Users.username == user)
+    current_user:Users = session.exec(statement).first()
 
     email = verify_reset_token(current_user.password_reset_token)
     if email is None:
@@ -276,6 +285,7 @@ async def password_reset_confirm_instance(
     current_user.password = get_password_hash(new_password)
     session.add(current_user)
     session.commit()
+    current_user.modified_at = datetime.now(timezone.utc)
     return {"message": "Password has been reset successfully"}
 
 
@@ -298,14 +308,15 @@ async def user_profile_delete_instance(
     ):  # only admin or one who owns the profile will be able to delete profile
         session.delete(profile)
         session.commit()
+        await remove_profile_data(profile)
         return {"detail": "Profile deleted successfully"}
 
 
 async def user_profile_update_instance(
     bio:str,
     is_private_account:bool,
-    file: UploadFile | None,
     session: SessionDep, 
+    files:  Optional[List[UploadFile]],  
     current_user: Users
 ):
     """
@@ -313,20 +324,39 @@ async def user_profile_update_instance(
     """
 
     profile = session.exec(select(Profile).where(Profile.username == current_user.username)).first()
+    
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
     profile.bio = bio if bio is not None else profile.bio
-    profile.profile_picture = (
-        file
-        if file is not None
-        else profile.profile_picture
-    )
+    allowed_extensions = {"jpg", "jpeg", "png", "gif", "mp4", "mkv", "avi", "mov"} 
+    file_urls = []
+    print("inside update profile instance")
+    if files:
+        for file in files:
+            file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
+            
+            if file_extension not in allowed_extensions:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unsupported file type: {file.filename}. Allowed types: {', '.join(allowed_extensions)}"
+                )
+
+        
+            file_bytes = await file.read()  
+            file_url = upload_to_minio(file_bytes, str(uuid.uuid4()) + "." + file_extension)
+            file_urls.append(file_url)
+
+
+    if len(file_urls):
+        profile.profile_picture=json.dumps(file_urls)
+    
     profile.is_private_account = (
         is_private_account
         if is_private_account is not None
         else profile.is_private_account
     )
+    
     profile.modified_at = datetime.now(timezone.utc)
 
     session.add(profile)
@@ -338,7 +368,7 @@ async def user_profile_create_instance(
     bio: str,
     is_private_account: bool,
     session: SessionDep,
-    files: List[UploadFile],  
+    files:  Optional[List[UploadFile]],  
     current_user: Users,
 ):
     """
@@ -354,26 +384,27 @@ async def user_profile_create_instance(
     if existing_profile:
         raise HTTPException(status_code=400, detail="User already has a profile")
 
-    allowed_extensions = {"jpg", "jpeg", "png", "gif", "mp4", "mkv", "avi", "mov"}  
+    allowed_extensions = {"jpg", "jpeg", "png", "gif", "mp4", "mkv", "avi", "mov"} 
+
     file_urls = []
+    if files:
+        for file in files:
+            file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
+            
+            if file_extension not in allowed_extensions:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unsupported file type: {file.filename}. Allowed types: {', '.join(allowed_extensions)}"
+                )
 
-    for file in files:
-        file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
         
-        if file_extension not in allowed_extensions:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported file type: {file.filename}. Allowed types: {', '.join(allowed_extensions)}"
-            )
-
-       
-        file_bytes = await file.read()  
-        file_url = upload_to_minio(file_bytes, str(uuid.uuid4()) + "." + file_extension)
-        file_urls.append(file_url)
+            file_bytes = await file.read()  
+            file_url = upload_to_minio(file_bytes, str(uuid.uuid4()) + "." + file_extension)
+            file_urls.append(file_url)
 
     new_profile = Profile(
         bio=bio,
-        profile_picture=file_urls,
+        profile_picture=json.dumps(file_urls),
         is_private_account=is_private_account,
         username=current_user.username,
     )
@@ -382,8 +413,32 @@ async def user_profile_create_instance(
     session.add(new_profile)
     session.commit()
     session.refresh(new_profile)
-
+    schedule_recommendation_email(new_profile.username)
     return new_profile
+
+
+
+
+def schedule_recommendation_email(username: str):
+    print("#### INSIDE SCHEDULE RECOMMENDATION EMAIL ######")
+    task_name = f"send_recommendation_email_{username}"
+    
+    # Remove any existing scheduled tasks for the user
+    app.conf.beat_schedule.pop(task_name, None)
+
+    # Add a new periodic task to Celery beat
+    app.conf.beat_schedule[task_name] = {
+        "task": "tasks.send_recommendation_email",
+        "schedule": crontab(minute=1),  # Runs daily
+        "args": [username],
+        "options": {"expires": datetime.now(UTC) + timedelta(seconds=20)},  # Expiry in case it doesn't trigger
+    }
+
+
+
+
+
+
 
 
 async def user_profile_get_instance(username: str, session: SessionDep):
@@ -403,7 +458,7 @@ async def create_connection_instance(
     if username == current_user.username:
         raise HTTPException(
             status_code=400,
-            detail="Bad Request",
+            detail="User can not sent request to themselves",
         )
 
     user = session.exec(select(Users).where(Users.username == username)).first()
@@ -442,6 +497,7 @@ async def create_connection_instance(
         connection_instance.status = 2 if profile.is_private_account else 1
         session.commit()
         session.refresh(connection_instance)
+        connection_instance.modified_at=datetime.now(timezone.utc)
         return {
             "message": (
                 "Connection request sent"
@@ -454,6 +510,7 @@ async def create_connection_instance(
         connection_instance.status = 0
         session.commit()
         session.refresh(connection_instance)
+        connection_instance.modified_at=datetime.now(timezone.utc)
         return {"message": "Connection request withdrawn"}
 
     return {"message": "User is already connected or followed"}
@@ -494,12 +551,14 @@ async def handle_connection_requests_instance(
             connection_requests.status = 1
             session.commit()
             session.refresh(connection_requests)
+            connection_requests.modified_at=datetime.now(timezone.utc)
             return {"message": "request accepted"}
         elif response.value == "reject":
             print("Request rejected")
             connection_requests.status = 0
             session.commit()
             session.refresh(connection_requests)
+            connection_requests.modified_at=datetime.now(timezone.utc)
             return {"message": "request rejected"}
         else:
             return {"message": "Invalid response"}
@@ -556,6 +615,7 @@ async def unfollow_user_instance(
     following.status = 0
     session.commit()
     session.refresh(following)
+    following.modified_at=datetime.now(timezone.utc)
     return {"message": f"You unfollowed {username}"}
 
 
@@ -577,6 +637,7 @@ async def remove_follower_instance(username:str,session:SessionDep,current_user:
     
     session.delete(result)
     session.commit()
+    result.modified_at=datetime.now(timezone.utc)
     return {"message": f"You removed {username}"}
 
     
@@ -611,5 +672,58 @@ async def create_default_superuser():
         )
         session.add(superuser)
         session.commit()
+
+
+# async def remove_profile_data(user_profile:Profile):
+#     """
+#     Service for deleting profile data from remote cloud storage
+#     """
+#     print(user_profile,type(user_profile))
+#     profile_pictures =  json.loads(user_profile.profile_picture)
+#     print(profile_pictures,type(profile_pictures))
+#     object_collection = []
+#     if profile_pictures:
+#         for i in profile_pictures:
+#             i =  i.split('/')
+#             object_collection.append(i[-1])
+#         print(object_collection)
+#     remove_object_from_minio(MINIO_PROFILE_PICTURE_BUCKET,object_collection)
+
+
+
+
+
+async def remove_profile_data(user_profile: Profile):
+    """
+    Service for deleting profile data from remote cloud storage.
+    Handles both single and multiple profile pictures.
+    """
+    print(user_profile, type(user_profile))
+
+    profile_picture_data = user_profile.profile_picture
+
+    object_collection = []
+
+    if profile_picture_data:
+        # Check if profile_picture is a JSON-encoded string (array)
+        try:
+            profile_pictures = json.loads(profile_picture_data)  # Try to parse as JSON
+            if isinstance(profile_pictures, list):
+                print("Handling multiple profile pictures...")
+                object_collection.extend([pic.split('/')[-1] for pic in profile_pictures])
+            else:
+                print("Unexpected JSON format for profile_picture. Expected a list.")
+        except json.JSONDecodeError:
+            # Handle it as a single string (URL)
+            print("Handling a single profile picture...")
+            object_collection.append(profile_picture_data.split('/')[-1])
+
+        print(f"Objects to be removed: {object_collection}")
+
+        # Remove objects from MinIO
+        remove_object_from_minio(MINIO_PROFILE_PICTURE_BUCKET, object_collection)
+    else:
+        print("No profile picture to remove.")
+
 
 
