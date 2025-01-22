@@ -321,7 +321,7 @@ async def user_profile_update_instance(
     profile.bio = bio if bio is not None else profile.bio
     allowed_extensions = {"jpg", "jpeg", "png", "gif", "mp4", "mkv", "avi", "mov"} 
     file_urls = []
-    
+    print("inside update profile instance")
     if files:
         for file in files:
             file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
@@ -338,11 +338,8 @@ async def user_profile_update_instance(
             file_urls.append(file_url)
 
 
-    profile.profile_picture = (
-        json.dumps(file_urls)
-        if file_urls is not None
-        else profile.profile_picture
-    )
+    if len(file_urls):
+        profile.profile_picture=json.dumps(file_urls)
     
     profile.is_private_account = (
         is_private_account
