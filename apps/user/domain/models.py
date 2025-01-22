@@ -46,7 +46,7 @@ class Connections(SQLModel, table=True):
     status: int  # status: 0 - rejected, 1 - accepted, 2 - pending
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
-    is_active: bool = Field(default=True)
+    is_active: bool = Field(default=True) 
 
 
 # class Subscription(SQLModel, table=True):
