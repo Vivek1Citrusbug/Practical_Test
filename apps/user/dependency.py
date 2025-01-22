@@ -49,7 +49,7 @@ def create_reset_token(email: str):
     """
     Function to create password reset token
     """
-     
+
     expire = datetime.now(UTC) + timedelta(hours=1)  # Token valid for 1 hour
     payload = {"sub": email, "exp": expire}
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -69,9 +69,13 @@ def verify_reset_token(token: str):
         return email
     except Exception as e:
         return f"An unexpected error occurred: {str(e)}"
-    
+
 
 def upload_to_minio(file: bytes, filename: str):
+    """
+    Function to upload file to minio storage bucket
+    """
+
     try:
         s3.put_object(
             Bucket=MINIO_PROFILE_PICTURE_BUCKET,
@@ -79,12 +83,41 @@ def upload_to_minio(file: bytes, filename: str):
             Body=file,
             ContentType="application/octet-stream",
         )
-        return f"http://{MINIO_STORAGE_ENDPOINT}/{MINIO_PROFILE_PICTURE_BUCKET}/{filename}"
+        return (
+            f"http://{MINIO_STORAGE_ENDPOINT}/{MINIO_PROFILE_PICTURE_BUCKET}/{filename}"
+        )
 
     except NoCredentialsError:
         return "Credentials not available"
     except Exception as e:
         return f"Error uploading file: {str(e)}"
+
+
+def remove_object_from_minio(bucket_name: str, object_name: list):
+    """
+    Function to delete file from minio storage bucket
+    """
+    
+    delete_objects = []
+    for obj_name in object_name:
+        delete_objects.append({"Key": obj_name})
+
+    try:
+        response = s3.delete_objects(
+            Bucket=bucket_name, Delete={"Objects": delete_objects}
+        )
+        if "Deleted" in response:
+            for deleted in response["Deleted"]:
+                print(
+                    f"Object '{deleted['Key']}' removed successfully from the bucket."
+                )
+        if "Errors" in response:
+            for error in response["Errors"]:
+                print(f"Error removing object '{error['Key']}': {error['Message']}")
+        else:
+            print("Removal completed")
+    except Exception as err:
+        print(f"Error removing object: {str(err)}")
 
 
 class ConnectionResponse(Enum):

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, UploadFile, status
 import httpx
 from passlib.context import CryptContext
-from apps.user.dependency import upload_to_minio
+from apps.user.dependency import upload_to_minio,remove_object_from_minio
 from config import (
     ALGORITHM,
     GITHUB_CLIENT_ID,
@@ -22,6 +22,7 @@ from config import (
     ADMIN_LASTNAME,
     ADMIN_NAME,
     ADMIN_PASSWORD,
+    MINIO_PROFILE_PICTURE_BUCKET
 )
 from apps.user.dependency import (
     verify_password,
@@ -303,8 +304,9 @@ async def user_profile_delete_instance(
         or current_user.is_staff
         or current_user.is_superuser
     ):  # only admin or one who owns the profile will be able to delete profile
-        session.delete(profile)
-        session.commit()
+        # session.delete(profile)
+        # session.commit()
+        await remove_profile_data(profile)
         return {"detail": "Profile deleted successfully"}
 
 
@@ -644,5 +646,21 @@ async def create_default_superuser():
         )
         session.add(superuser)
         session.commit()
+
+async def remove_profile_data(user_profile:Profile):
+    """
+    Service for deleting profile data from remote cloud storage
+    """
+
+    profile_pictures =  json.loads(user_profile.profile_picture)
+    object_collection = []
+    if profile_pictures:
+        for i in profile_pictures:
+            i =  i.split('/')
+            object_collection.append(i[-1])
+        print(object_collection)
+    remove_object_from_minio(MINIO_PROFILE_PICTURE_BUCKET,object_collection)
+
+
 
 
