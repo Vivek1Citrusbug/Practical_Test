@@ -31,7 +31,7 @@ from config import (
     STRIPE_ENDPOINT_SECRET_KEY,
 )
 from apps.user.application.schemas import Token, UserProfileCreate, UserProfilePublic
-from apps.user.domain.models import Connections
+from apps.user.domain.models import Connections,Transaction,Subscription
 from fastapi.security import OAuth2PasswordRequestForm
 from database import engine, SessionDep
 from apps.user.domain.service import (
@@ -235,33 +235,42 @@ async def remove_follower(
     )
 
 
-# @router.post("/create-checkout-session")
-# async def checkout(amount: int, session: SessionDep):
-#     if amount != 500:
-#         raise HTTPException(status_code=400, detail="Amount must be $5")
-#     try:
-#         session = stripe.checkout.Session.create(
-#             payment_method_types=["card"],
-#             line_items=[
-#                 {
-#                     "price_data": {
-#                         "currency": "usd",
-#                         "product_data": {"name": "Subscription"},
-#                         "unit_amount": amount,
-#                     },
-#                     "quantity": 1,
-#                 },
-#             ],
-#             mode="payment",
-#             success_url=STRIPE_SUCCESS_URL,
-#             cancel_url=STRIPE_FAILURE_URL,
-#         )
-#         print(session)
-#         return {"checkout_url": session.url}
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=400, detail=f"Error creating checkout session: {str(e)}"
-#         )
+@router.post("/create-checkout-session")
+async def checkout(amount: int, session: SessionDep,current_user: Users = Depends(get_current_user)):
+    if amount != 500:
+        raise HTTPException(status_code=400, detail="Amount must be $5")
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[
+                {
+                    "price_data": {
+                        "currency": "usd",
+                        "product_data": {"name": "Subscription"},
+                        "unit_amount": amount,
+                    },
+                    "quantity": 1,
+                },
+            ],
+            mode="payment",
+            success_url=STRIPE_SUCCESS_URL,
+            cancel_url=STRIPE_FAILURE_URL,
+        )
+        print(session)
+        
+        # # Simulate payment process and create a pending transaction
+        # transaction = Transaction(
+        #     username=current_user.username,
+        #     subscription_id=user.subscription.id,  # Reference to the subscription
+        #     amount=current_user.subscription.monthly_fee,
+        #     payment_status="pending",
+        #     payment_method="card"
+        # )
+        return {"checkout_url": session.url}
+    except Exception as e:
+        raise HTTPException(
+            status_code=400, detail=f"Error creating checkout session: {str(e)}"
+        )
 
 
 # @router.post("/webhook")

@@ -1,7 +1,7 @@
 from apps.user.application.schemas import UserBaseModel
 from sqlmodel import Field, SQLModel, Relationship
 from datetime import datetime, timezone
-from typing import Optional, TYPE_CHECKING,List
+from typing import Optional, TYPE_CHECKING, List
 from apps.posts.domain.models import Posts
 from pydantic import EmailStr
 
@@ -11,7 +11,7 @@ from pydantic import EmailStr
 
 
 class Users(UserBaseModel, table=True):
-    email:EmailStr = Field(default=None, primary_key=True)
+    email: EmailStr = Field(default=None, primary_key=True)
     password: str
     password_reset_token: str = Field(default="")
     is_verified: bool = Field(default=False)
@@ -21,8 +21,37 @@ class Users(UserBaseModel, table=True):
 
     # Relationship to Profile
     profile: Optional["Profile"] = Relationship(back_populates="user")
-    
-    # subscription: Optional["Subscription"] = Relationship(back_populates="users")
+
+    subscription: Optional["Subscription"] = Relationship(back_populates="users")
+
+    transactions: Optional["Transaction"] = Relationship(back_populates="user")
+
+
+class Subscription(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    plan_type: str = Field(default="free")  # 'free' or 'paid'
+    monthly_fee: int = Field(default=0)
+    expire_at: Optional[str] = Field(default=None)
+    username: str = Field(foreign_key="users.username", ondelete="CASCADE")
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
+    modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
+    is_active: bool = Field(default=True)
+
+    users: Optional["Users"] = Relationship(back_populates="subscription")
+    transactions: Optional["Transaction"] = Relationship(back_populates="subscription")
+
+
+class Transaction(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str = Field(foreign_key="users.username", ondelete="CASCADE")
+    subscription_id: int = Field(foreign_key="subscription.id", ondelete="CASCADE")
+    amount: int # remove
+    payment_status: str  # 'completed', 'failed', etc.
+    payment_method: str  # 'card', 'paypal', etc. # remove
+    # add stripe payment intent id
+    user: Optional["Users"] = Relationship(back_populates="transactions")
+    subscription: Optional["Subscription"] = Relationship(back_populates="transactions")
+
 
 class Profile(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -47,26 +76,4 @@ class Connections(SQLModel, table=True):
     status: int  # status: 0 - rejected, 1 - accepted, 2 - pending
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
-    is_active: bool = Field(default=True) 
-
-# class Subscription(SQLModel,table=True):
-#     id: Optional[int] = Field(default=None, primary_key=True)
-#     plan_type:str = Field(default="free")  # 'free' or 'paid'
-#     monthly_fee:int = Field(default = 0)
-#     expire_at: Optional[str] = Field(default=None)
-#     username: str = Field(foreign_key="users.username", ondelete="CASCADE")
-#     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
-#     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
-#     is_active: bool = Field(default=True) 
-
-#     users:Optional["Users"] = Relationship(back_populates='subscription')
-
-# class Transaction(SQLModel,table=True):
-#     id: Optional[int] = Field(default=None, primary_key=True)
-#     user:str =Field(foreign_key= 'users.username',ondelete="CASCADE")
-#     amount:int = Field(default=0)
-#     payment_status:str 
-#     user = Relationship()
-#     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
-#     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
-#     is_active: bool = Field(default=True) 
+    is_active: bool = Field(default=True)
