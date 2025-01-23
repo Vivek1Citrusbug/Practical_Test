@@ -31,3 +31,5 @@ start worker
 
 start celery beat for recurring task
 - Command : celery -A apps.posts.domain.tasks.celery_app beat --loglevel INFO 
+
+start strip cli locally to get stripe secret key
