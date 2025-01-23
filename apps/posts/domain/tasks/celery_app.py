@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+import json
 from celery import Celery
 from celery.schedules import crontab
 from apps.posts.domain.service import list_recommended_posts_instance
@@ -61,14 +62,15 @@ def send_post_recommendation_email():
         for i in users_to_send_email:
             recommended_posts = list_recommended_posts_instance(session,i.user)
             serialized_posts = serialize_posts(recommended_posts)
-            print(serialized_posts)
+            # serialized_posts_json = json.dumps(serialized_posts)
+            print(serialize_posts)
             message = Mail(
                 from_email=FROM_EMAIL,
                 to_emails= i.user.email,
                 subject="Your Daily Recommended Posts",
             )
             message.dynamic_template_data = {
-                "posts" : serialized_posts,
+                "posts" : serialize_posts,
             }
             message.template_id = SENDGRID_TEMPLATE_POST_RECOMMENDATION
             try:
