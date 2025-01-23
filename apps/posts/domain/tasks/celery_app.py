@@ -2,7 +2,6 @@ from datetime import UTC, datetime, timedelta
 from celery import Celery
 from celery.schedules import crontab
 from apps.posts.domain.service import list_recommended_posts_instance
-
 from sqlmodel import Session
 from email.message import EmailMessage
 from config import SENDGRID_POST_RECOMMENDATION_API_KEY,FROM_EMAIL,SENDGRID_TEMPLATE_POST_RECOMMENDATION
@@ -36,8 +35,19 @@ celery_app.autodiscover_tasks(
 )
 
 celery_app.conf.timezone = "Asia/Kolkata"
-# celery_app.conf.broker_connection_retry_on_startup = True
 
+def serialize_posts(posts:list[Posts]):
+    """
+    Converts a list of Posts objects to a list of dictionaries.
+    """
+    return [
+        {
+            "title": post.title,
+            "content": post.content,
+            "file_url": post.file_url
+        }
+        for post in posts
+    ]
 
 @celery_app.task
 def send_post_recommendation_email():
@@ -50,13 +60,15 @@ def send_post_recommendation_email():
             
         for i in users_to_send_email:
             recommended_posts = list_recommended_posts_instance(session,i.user)
+            serialized_posts = serialize_posts(recommended_posts)
+            print(serialized_posts)
             message = Mail(
                 from_email=FROM_EMAIL,
                 to_emails= i.user.email,
                 subject="Your Daily Recommended Posts",
             )
             message.dynamic_template_data = {
-                "posts": recommended_posts,
+                "posts" : serialized_posts,
             }
             message.template_id = SENDGRID_TEMPLATE_POST_RECOMMENDATION
             try:
