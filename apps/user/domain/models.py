@@ -21,7 +21,8 @@ class Users(UserBaseModel, table=True):
 
     # Relationship to Profile
     profile: Optional["Profile"] = Relationship(back_populates="user")
-
+    
+    # subscription: Optional["Subscription"] = Relationship(back_populates="users")
 
 class Profile(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -48,3 +49,24 @@ class Connections(SQLModel, table=True):
     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = Field(default=True) 
 
+# class Subscription(SQLModel,table=True):
+#     id: Optional[int] = Field(default=None, primary_key=True)
+#     plan_type:str = Field(default="free")  # 'free' or 'paid'
+#     monthly_fee:int = Field(default = 0)
+#     expire_at: Optional[str] = Field(default=None)
+#     username: str = Field(foreign_key="users.username", ondelete="CASCADE")
+#     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
+#     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
+#     is_active: bool = Field(default=True) 
+
+#     users:Optional["Users"] = Relationship(back_populates='subscription')
+
+# class Transaction(SQLModel,table=True):
+#     id: Optional[int] = Field(default=None, primary_key=True)
+#     user:str =Field(foreign_key= 'users.username',ondelete="CASCADE")
+#     amount:int = Field(default=0)
+#     payment_status:str 
+#     user = Relationship()
+#     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
+#     modified_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
+#     is_active: bool = Field(default=True) 

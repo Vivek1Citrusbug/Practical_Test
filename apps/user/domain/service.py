@@ -426,9 +426,9 @@ def schedule_recommendation_email(user:Users):
     task_name = f"send_recommendation_email_{user.username}"
     celery_app.conf.beat_schedule.pop(task_name, None)
     celery_app.conf.beat_schedule[task_name] = {
-        "task": "apps.posts.domain.tasks.task.send_post_recommendation_email", 
+        "task": "tasks.task.send_post_recommendation_email", 
         "schedule": crontab(minute=1),  
-        "args": [user.email],  
+        "args": [user],  
     }
 
 

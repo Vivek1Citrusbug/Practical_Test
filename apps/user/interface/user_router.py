@@ -235,82 +235,82 @@ async def remove_follower(
     )
 
 
-@router.post("/create-checkout-session")
-async def checkout(amount: int, session: SessionDep):
-    if amount != 500:
-        raise HTTPException(status_code=400, detail="Amount must be $5")
-    try:
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            line_items=[
-                {
-                    "price_data": {
-                        "currency": "usd",
-                        "product_data": {"name": "Subscription"},
-                        "unit_amount": amount,
-                    },
-                    "quantity": 1,
-                },
-            ],
-            mode="payment",
-            success_url=STRIPE_SUCCESS_URL,
-            cancel_url=STRIPE_FAILURE_URL,
-        )
-        print(session)
+# @router.post("/create-checkout-session")
+# async def checkout(amount: int, session: SessionDep):
+#     if amount != 500:
+#         raise HTTPException(status_code=400, detail="Amount must be $5")
+#     try:
+#         session = stripe.checkout.Session.create(
+#             payment_method_types=["card"],
+#             line_items=[
+#                 {
+#                     "price_data": {
+#                         "currency": "usd",
+#                         "product_data": {"name": "Subscription"},
+#                         "unit_amount": amount,
+#                     },
+#                     "quantity": 1,
+#                 },
+#             ],
+#             mode="payment",
+#             success_url=STRIPE_SUCCESS_URL,
+#             cancel_url=STRIPE_FAILURE_URL,
+#         )
+#         print(session)
+#         return {"checkout_url": session.url}
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=400, detail=f"Error creating checkout session: {str(e)}"
+#         )
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Error creating checkout session: {str(e)}"
-        )
 
+# @router.post("/webhook")
+# async def stripe_webhook(
+#     request: Request,
+#     db_session: SessionDep,
+#     current_user: Users = Depends(get_current_user),
+# ):
+#     payload = await request.body()
+#     sig_header = request.headers.get("Stripe-Signature")
+#     endpoint_secret = STRIPE_ENDPOINT_SECRET_KEY
 
-@router.post("/webhook")
-async def stripe_webhook(
-    request: Request,
-    db_session: SessionDep,
-    current_user: Users = Depends(get_current_user),
-):
-    payload = await request.body()
-    sig_header = request.headers.get("Stripe-Signature")
-    endpoint_secret = STRIPE_ENDPOINT_SECRET_KEY
+#     try:
+#         event = stripe.Webhook.construct_event(
+#             payload=payload, sig_header=sig_header, secret=endpoint_secret
+#         )
+#     except stripe.error.SignatureVerificationError as e:
+#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    try:
-        event = stripe.Webhook.construct_event(
-            payload=payload, sig_header=sig_header, secret=endpoint_secret
-        )
-    except stripe.error.SignatureVerificationError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+#     if event["type"] in [
+#         "payment_intent.succeeded",
+#         "charge.updated",
+#         "charge.succeeded",
+#     ]:
+#         payment_obj = event["data"]["object"]
+#         customer_email = payment_obj.get("billing_details", {}).get("email")
+#         if not customer_email:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Email not found in payment details",
+#             )
 
-    if event["type"] in [
-        "payment_intent.succeeded",
-        "charge.updated",
-        "charge.succeeded",
-    ]:
-        payment_obj = event["data"]["object"]
-        customer_email = payment_obj.get("billing_details", {}).get("email")
-        if not customer_email:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email not found in payment details",
-            )
+#         statement = select(Users).where(Users.email == customer_email)
+#         user = db_session.exec(statement).first()
 
-        statement = select(Users).where(Users.email == customer_email)
-        user = db_session.exec(statement).first()
+#         if not user:
+#             raise HTTPException(
+#                 status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+#             )
 
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-            )
+#         user.is_staff = True
+#         user.is_superuser = True
 
-        user.is_staff = True
-        user.is_superuser = True
+#         db_session.add(user)
+#         db_session.commit()
 
-        db_session.add(user)
-        db_session.commit()
+#         # # schedule task for the eta
+#         # revert_user_role.apply_async(args=[user.email], eta=user.expiration_time)
 
-        # # schedule task for the eta
-        # revert_user_role.apply_async(args=[user.email], eta=user.expiration_time)
-
-    else:
-        print(f"Unhandled event type: {event['type']}")
-    return {"status": "success"}
+#     else:
+#         print(f"Unhandled event type: {event['type']}")
+#     return {"status": "success"}

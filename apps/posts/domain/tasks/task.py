@@ -11,21 +11,24 @@ from apps.posts.domain.models import Posts
 from service import list_recommended_posts_instance
 from database import SessionDep
 from user.domain.service import get_current_user
+from user.domain.models import Users
 from config import SENDGRID_POST_RECOMMENDATION_API_KEY,FROM_EMAIL,SENDGRID_TEMPLATE_POST_RECOMMENDATION
+
+
 
 @celery_application.task
 def send_post_recommendation_email(
-    user_email: str,
+    user:Users,
     session:SessionDep
 ):
     """
     Celery function to send email notification to user regarding their post removal
     """
 
-    recommended_posts = list_recommended_posts_instance(session)
+    recommended_posts = list_recommended_posts_instance(session,user)
     message = Mail(
         from_email=FROM_EMAIL,
-        to_emails=user_email,
+        to_emails=user.email,
         subject="Your Daily Recommended Posts",
     )
     message.dynamic_template_data = {
