@@ -21,3 +21,13 @@ start minio server
 
 set alias for server
 - mc alias set 'myminio' 'http://192.168.1.48:9000' 'minioadmin' 'minioadmin'
+
+## celery commands
+start redis server
+- redis-server
+
+start worker
+- celery -A tasks.task_2_celery worker --loglevel INFO -P gevent 
+
+start celery beat for recurring task
+- Command : celery -A tasks.task_2_celery beat --loglevel INFO 
