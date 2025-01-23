@@ -47,7 +47,7 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import ssl
 import json
-from apps.posts.domain.tasks.celery_app import app
+from apps.posts.domain.tasks.celery_app import celery_app
 from celery.schedules import crontab
 
 # Disable SSL verification (not recommended for production)
@@ -413,27 +413,23 @@ async def user_profile_create_instance(
     session.add(new_profile)
     session.commit()
     session.refresh(new_profile)
-    schedule_recommendation_email(new_profile.username)
+    schedule_recommendation_email(current_user)
     return new_profile
 
 
 
 
-def schedule_recommendation_email(username: str):
+def schedule_recommendation_email(user:Users):
+
     print("#### INSIDE SCHEDULE RECOMMENDATION EMAIL ######")
-    task_name = f"send_recommendation_email_{username}"
-    
-    # Remove any existing scheduled tasks for the user
-    app.conf.beat_schedule.pop(task_name, None)
 
-    # Add a new periodic task to Celery beat
-    app.conf.beat_schedule[task_name] = {
-        "task": "tasks.send_recommendation_email",
-        "schedule": crontab(minute=1),  # Runs daily
-        "args": [username],
-        "options": {"expires": datetime.now(UTC) + timedelta(seconds=20)},  # Expiry in case it doesn't trigger
+    task_name = f"send_recommendation_email_{user.username}"
+    celery_app.conf.beat_schedule.pop(task_name, None)
+    celery_app.conf.beat_schedule[task_name] = {
+        "task": "apps.posts.domain.tasks.task.send_post_recommendation_email", 
+        "schedule": crontab(minute=1),  
+        "args": [user.email],  
     }
-
 
 
 

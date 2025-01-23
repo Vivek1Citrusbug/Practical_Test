@@ -2,18 +2,18 @@
 ######## Recurring task for giving recommendation to user for everyday at 10:00 AM UST #######
 ##############################################################################################
 
-from tasks.celery_app import app
+from apps.posts.domain.tasks.celery_app import celery_app as celery_application
 from email.message import EmailMessage
-from config import SENDGRID_POST_RECOMMENDATION_API_KEY,FROM_EMAIL,SENDGRID_TEMPLATE_POST_RECOMMENDATION
 from sendgrid.helpers.mail import Mail
 from datetime import datetime
 from sendgrid import SendGridAPIClient
 from apps.posts.domain.models import Posts
-from apps.posts.domain.service import list_recommended_posts_instance
+from service import list_recommended_posts_instance
 from database import SessionDep
-from apps.user.domain.service import get_current_user
+from user.domain.service import get_current_user
+from config import SENDGRID_POST_RECOMMENDATION_API_KEY,FROM_EMAIL,SENDGRID_TEMPLATE_POST_RECOMMENDATION
 
-@app.task(name="tasks.send_recommendation_email")
+@celery_application.task
 def send_post_recommendation_email(
     user_email: str,
     session:SessionDep

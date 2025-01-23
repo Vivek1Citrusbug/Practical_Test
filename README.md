@@ -27,7 +27,7 @@ start redis server
 - redis-server
 
 start worker
-- celery -A tasks.task_2_celery worker --loglevel INFO -P gevent 
+- celery -A celery worker --loglevel INFO -P gevent 
 
 start celery beat for recurring task
-- Command : celery -A tasks.task_2_celery beat --loglevel INFO 
+- Command : celery -A celery beat --loglevel INFO 
