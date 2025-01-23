@@ -25,13 +25,13 @@ from datetime import datetime, timedelta, timezone
 from config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     GITHUB_CLIENT_ID,
-    STRIPE_API_KEY,
+    STRIPE_SECRET_API_KEY,
     STRIPE_SUCCESS_URL,
     STRIPE_FAILURE_URL,
     STRIPE_ENDPOINT_SECRET_KEY,
 )
 from apps.user.application.schemas import Token, UserProfileCreate, UserProfilePublic
-from apps.user.domain.models import Connections
+from apps.user.domain.models import Connections,Transaction,Subscription
 from fastapi.security import OAuth2PasswordRequestForm
 from database import engine, SessionDep
 from apps.user.domain.service import (
@@ -61,7 +61,7 @@ from fastapi import status, File
 
 router = APIRouter()
 
-stripe.api_key = STRIPE_API_KEY
+stripe.api_key = STRIPE_SECRET_API_KEY
 
 
 @router.post("/register", response_model=UserPublicModel, tags=["Users"])
@@ -253,27 +253,49 @@ async def checkout(amount: int, session: SessionDep):
                 },
             ],
             mode="payment",
-            success_url=STRIPE_SUCCESS_URL,
+            success_url=STRIPE_SUCCESS_URL+"/after-checkout?session_id={CHECKOUT_SESSION_ID}",
             cancel_url=STRIPE_FAILURE_URL,
         )
-        print(session)
 
+        print(session)
+        
+        return {"checkout_url": session.url}
+    
     except Exception as e:
         raise HTTPException(
             status_code=400, detail=f"Error creating checkout session: {str(e)}"
         )
 
 
+
+@router.get("/success/{session_id}")
+async def success(
+    session_id: str,
+    db_session: SessionDep,
+):
+    session = stripe.checkout.Session.retrieve(session_id,expand=['line_items'],)
+    print(session)
+    # user = db_session.get(UserModel, current_user.username)
+    # if user:
+    #     user.is_staff = True
+    #     user.is_superuser = True
+    #     db_session.commit()
+    #     return {"message": "Payment successful, role upgraded to admin."}
+    # else:
+    #     raise HTTPException(status_code=404, detail="User not found")
+
+
 @router.post("/webhook")
 async def stripe_webhook(
     request: Request,
     db_session: SessionDep,
-    current_user: Users = Depends(get_current_user),
 ):
     payload = await request.body()
+    print("########### Payload #############",payload)
     sig_header = request.headers.get("Stripe-Signature")
+    print("########### sig header #############",sig_header)
     endpoint_secret = STRIPE_ENDPOINT_SECRET_KEY
-
+    
     try:
         event = stripe.Webhook.construct_event(
             payload=payload, sig_header=sig_header, secret=endpoint_secret
@@ -283,8 +305,8 @@ async def stripe_webhook(
 
     if event["type"] in [
         "payment_intent.succeeded",
-        "charge.updated",
         "charge.succeeded",
+        "checkout.session.completed",
     ]:
         payment_obj = event["data"]["object"]
         customer_email = payment_obj.get("billing_details", {}).get("email")

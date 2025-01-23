@@ -47,7 +47,6 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import ssl
 import json
-from apps.posts.domain.tasks.celery_app import app
 from celery.schedules import crontab
 
 # Disable SSL verification (not recommended for production)
@@ -413,28 +412,8 @@ async def user_profile_create_instance(
     session.add(new_profile)
     session.commit()
     session.refresh(new_profile)
-    schedule_recommendation_email(new_profile.username)
+    # schedule_recommendation_email(current_user)
     return new_profile
-
-
-
-
-def schedule_recommendation_email(username: str):
-    print("#### INSIDE SCHEDULE RECOMMENDATION EMAIL ######")
-    task_name = f"send_recommendation_email_{username}"
-    
-    # Remove any existing scheduled tasks for the user
-    app.conf.beat_schedule.pop(task_name, None)
-
-    # Add a new periodic task to Celery beat
-    app.conf.beat_schedule[task_name] = {
-        "task": "tasks.send_recommendation_email",
-        "schedule": crontab(minute=1),  # Runs daily
-        "args": [username],
-        "options": {"expires": datetime.now(UTC) + timedelta(seconds=20)},  # Expiry in case it doesn't trigger
-    }
-
-
 
 
 
@@ -705,22 +684,19 @@ async def remove_profile_data(user_profile: Profile):
     object_collection = []
 
     if profile_picture_data:
-        # Check if profile_picture is a JSON-encoded string (array)
         try:
-            profile_pictures = json.loads(profile_picture_data)  # Try to parse as JSON
+            profile_pictures = json.loads(profile_picture_data) 
             if isinstance(profile_pictures, list):
                 print("Handling multiple profile pictures...")
                 object_collection.extend([pic.split('/')[-1] for pic in profile_pictures])
             else:
                 print("Unexpected JSON format for profile_picture. Expected a list.")
         except json.JSONDecodeError:
-            # Handle it as a single string (URL)
             print("Handling a single profile picture...")
             object_collection.append(profile_picture_data.split('/')[-1])
 
         print(f"Objects to be removed: {object_collection}")
 
-        # Remove objects from MinIO
         remove_object_from_minio(MINIO_PROFILE_PICTURE_BUCKET, object_collection)
     else:
         print("No profile picture to remove.")

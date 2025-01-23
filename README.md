@@ -21,3 +21,15 @@ start minio server
 
 set alias for server
 - mc alias set 'myminio' 'http://192.168.1.48:9000' 'minioadmin' 'minioadmin'
+
+## celery commands
+start redis server
+- redis-server
+
+start worker
+- celery -A apps.posts.domain.tasks.celery_app worker --pool=solo --loglevel INFO  
+
+start celery beat for recurring task
+- Command : celery -A apps.posts.domain.tasks.celery_app beat --loglevel INFO 
+
+start strip cli locally to get stripe secret key

@@ -110,7 +110,7 @@ def list_recommended_posts_instance(session: SessionDep, current_user: Users):
         Posts.id.not_in(liked_post_ids), Posts.post_by != current_user.username
     )
     posts = session.exec(query).all()
-    random_posts = random.sample(posts, min(5, len(posts)))
+    random_posts:list[Posts] = random.sample(posts, min(5, len(posts)))
     return random_posts
 
 
