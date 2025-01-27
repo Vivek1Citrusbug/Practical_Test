@@ -1,47 +1,42 @@
 import pytest
-import uuid
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-from fastapi.testclient import TestClient
+from sqlalchemy.ext.declarative import declarative_base
 from main import app
 from database import base, get_db
 
-SQLITE_DATABASE_URL = "sqlite:///./testdb.db"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
-engine = create_engine(
-    SQLITE_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-base.metadata.create_all(bind=engine)
+
+@pytest.fixture()
+def session():
+
+    base.metadata.drop_all(bind=engine)
+    base.metadata.create_all(bind=engine)
+
+    db = TestingSessionLocal()
+
+    try:
+        yield db
+    finally:
+        db.close()
 
 
-@pytest.fixture(scope="function")
-def db_session():
-    """Create a new database session with a rollback at the end of the test."""
-    connection = engine.connect()
-    transaction = connection.begin()
-    session = TestingSessionLocal(bind=connection)
-    yield session
-    session.close()
-    transaction.rollback()
-    connection.close()
-
-
-@pytest.fixture(scope="function")
-def test_client(db_session):
-    """Create a test client that uses the override_get_db fixture to return a session."""
+@pytest.fixture()
+def client(session):
 
     def override_get_db():
         try:
-            yield db_session
+
+            yield session
         finally:
-            db_session.close()
+            session.close()
 
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as test_client:
-        yield test_client
+
+    yield TestClient(app)
