@@ -29,8 +29,8 @@ class Users(UserBaseModel, table=True):
 
 class Subscription(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    plan_type: str = Field(default="free")  # 'free' or 'paid'
-    monthly_fee: int = Field(default=0)
+    type: str = Field(default="free")  # 'free' or 'paid'
+    amount: int = Field(default=0)
     expire_at: Optional[str] = Field(default=None)
     username: str = Field(foreign_key="users.username", ondelete="CASCADE")
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -44,11 +44,9 @@ class Subscription(SQLModel, table=True):
 class Transaction(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(foreign_key="users.username", ondelete="CASCADE")
-    subscription_id: int = Field(foreign_key="subscription.id", ondelete="CASCADE")
-    amount: int # remove
+    subscription_id: int = Field(foreign_key="subscription.id", ondelete="CASCADE",nullable=True)
     payment_status: str  # 'completed', 'failed', etc.
-    payment_method: str  # 'card', 'paypal', etc. # remove
-    # add stripe payment intent id
+    payment_intent_id:str
     user: Optional["Users"] = Relationship(back_populates="transactions")
     subscription: Optional["Subscription"] = Relationship(back_populates="transactions")
 
