@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr
 
 
 class UserBaseModel(SQLModel):
-    username: str = Field(unique=True,nullable=False)
+    username: str = Field(unique=True, nullable=False)
     name: str | None = Field(default=None)
     first_name: str | None = Field(default=None)
     last_name: str | None = Field(default=None)
@@ -25,16 +25,28 @@ class UserPublicModel(SQLModel):
 
 
 class UserCreateModel(SQLModel):
-    username: str = Field(max_length=20,min_length=5, schema_extra={'pattern': r'^[a-zA-Z0-9]+$'})
-    name: str = Field(max_length=20,min_length=5, schema_extra={'pattern': r"^[a-zA-Z\s]+$"})
-    first_name: str = Field(max_length=20,min_length=5,schema_extra={'pattern': r"^[a-zA-Z]+$"})
-    last_name: str = Field(max_length=20,min_length=5,schema_extra={'pattern': r"^[a-zA-Z]+$"} )
+    username: str = Field(
+        max_length=20, min_length=5, schema_extra={"pattern": r"^[a-zA-Z0-9]+$"}
+    )
+    name: str = Field(
+        max_length=20, min_length=5, schema_extra={"pattern": r"^[a-zA-Z\s]+$"}
+    )
+    first_name: str = Field(
+        max_length=20, min_length=5, schema_extra={"pattern": r"^[a-zA-Z]+$"}
+    )
+    last_name: str = Field(
+        max_length=20, min_length=5, schema_extra={"pattern": r"^[a-zA-Z]+$"}
+    )
     email: EmailStr
-    password: str = Field(max_length=20,min_length=8,schema_extra={'pattern': r"^[A-Za-z0-9@#$%^&+=]{8,}"})
+    password: str = Field(
+        max_length=20,
+        min_length=8,
+        schema_extra={"pattern": r"^[A-Za-z0-9@#$%^&+=]{8,}"},
+    )
 
 
 class UserProfileCreate(SQLModel):
-    bio: str | None = Field(default=None,max_length=30)
+    bio: str | None = Field(default=None, max_length=30)
     is_private_account: bool
 
 
@@ -57,5 +69,3 @@ class TokenData(SQLModel):
 
 class PasswordResetRequest(BaseModel):
     email: EmailStr
-
-

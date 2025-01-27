@@ -45,7 +45,7 @@ class Transaction(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(foreign_key="users.username", ondelete="CASCADE")
     subscription_id: int = Field(foreign_key="subscription.id", ondelete="CASCADE",nullable=True)
-    payment_status: str  # 'completed', 'failed', etc.
+    payment_status: str  # 'paid', 'failed', 'pending' 
     payment_intent_id:str
     user: Optional["Users"] = Relationship(back_populates="transactions")
     subscription: Optional["Subscription"] = Relationship(back_populates="transactions")

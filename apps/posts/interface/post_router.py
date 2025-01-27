@@ -51,14 +51,6 @@ def list_posts(
     return list_posts_application(session,current_user, skip, limit, username)
 
 
-@router.get("/recommended_posts/", response_model=List[PostPublicModel])
-def list_recommended_posts(
-    session: SessionDep,
-    current_user: Users = Depends(get_current_user),
-):
-    return list_recommended_posts_application(session, current_user)
-
-
 @router.put("/{post_id}/", response_model=PostPublicModel)
 def update_post(
     post_id: int,
