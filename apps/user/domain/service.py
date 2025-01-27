@@ -323,8 +323,8 @@ async def user_profile_delete_instance(
 
 
 async def user_profile_update_instance(
-    bio: str,
-    is_private_account: bool,
+    bio: str | None,
+    is_private_account: bool | None,
     session: SessionDep,
     files: Optional[List[UploadFile]],
     current_user: Users,
@@ -341,8 +341,11 @@ async def user_profile_update_instance(
         raise HTTPException(status_code=404, detail="Profile not found")
 
     profile.bio = bio if bio is not None else profile.bio
+    
     allowed_extensions = {"jpg", "jpeg", "png", "gif", "mp4", "mkv", "avi", "mov"}
+    
     file_urls = []
+    
     print("inside update profile instance")
     if files:
         for file in files:
@@ -794,8 +797,6 @@ def fulfill_checkout(session_id: str, db_session: SessionDep):
             )
 
         if payment_status == "paid":
-            print("####### Payment Successful #######")
-
             subscription = Subscription(
                 username=user.username,
                 type="Paid",
@@ -805,6 +806,8 @@ def fulfill_checkout(session_id: str, db_session: SessionDep):
                 created_at=datetime.now(),
                 modified_at=datetime.now(),
             )
+            db_session.add(subscription)
+            db_session.commit()
 
             transaction = Transaction(
                 username=user.username,
@@ -812,20 +815,19 @@ def fulfill_checkout(session_id: str, db_session: SessionDep):
                 payment_status="paid",
                 payment_intent_id=payment_intent_id,
             )
-
-            # Update the is_verified field
-            user.is_verified = True
-            db_session.add(subscription)
             db_session.add(transaction)
+            db_session.commit()
+
+            user.is_verified = True
+            
             db_session.add(user)
             db_session.commit()
             db_session.refresh(user)
+
             print(f"User {user.username} has been verified.")
 
 
         elif payment_status == "unpaid":
-            print("####### Payment Failed #######")
-
             transaction = Transaction(
                 username=user.username,
                 payment_status="failed",
@@ -833,10 +835,8 @@ def fulfill_checkout(session_id: str, db_session: SessionDep):
             )
             db_session.add(transaction)
             db_session.commit()
-
+    
         elif payment_status == "requires_payment":
-            print("####### Payment Requires Confirmation #######")
-
             transaction = Transaction(
                 username=user.username,
                 payment_status="pending",

@@ -153,14 +153,14 @@ async def get_profile(username: str, session: SessionDep):
 
 @router.put("/profiles/{username}/", response_model=UserProfilePublic, tags=["Profile"])
 async def update_profile(
-    bio: str | None,
-    is_private_account: bool | None,
     session: SessionDep,
-    file: Optional[list[UploadFile]] = File(None),
+    bio: str | None = Form(...),
+    is_private_account: bool | None = Form(...),
+    file: Optional[list[UploadFile]] | None= File(None),
     current_user: Users = Depends(get_current_user),
 ):
     return await user_profile_update_application(
-        bio, is_private_account, session, file, current_user
+        bio, is_private_account, session, current_user, file
     )
 
 

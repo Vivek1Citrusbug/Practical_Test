@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException, UploadFile, Form, Depends, APIRouter, status
+from fastapi import FastAPI, File, HTTPException, UploadFile, Form, Depends, APIRouter, status
 from sqlmodel import Session, select
-from typing import List
+from typing import List, Optional
 from database import engine, SessionDep
 from apps.posts.domain.models import Posts, ReportedPosts, Comments, Likes
 from apps.user.domain.service import get_current_user
@@ -27,14 +27,13 @@ from apps.posts.application.service import (
 
 router = APIRouter()
 
-
 @router.post("/", response_model=PostPublicModel)
 def create_post(
     session: SessionDep,
     title: str,
     content: str,
     current_user: Users = Depends(get_current_user),
-    file: UploadFile | None = None,
+    file: Optional[UploadFile] = File(None),
     
 ):
     return create_post_application(session, title, content,current_user, file)

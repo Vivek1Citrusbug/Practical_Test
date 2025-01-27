@@ -1,4 +1,5 @@
 import random
+from typing import Optional
 import uuid
 from sqlmodel import select
 from datetime import datetime, timezone,UTC
@@ -33,7 +34,7 @@ def create_post_instance(
     title: str,
     content: str,
     current_user: Users,
-    file: UploadFile | None = None,
+    file: Optional[UploadFile],
 ):
     """
     Domain layer service for creating post

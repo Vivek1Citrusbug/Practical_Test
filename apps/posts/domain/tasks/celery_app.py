@@ -62,25 +62,27 @@ def send_post_recommendation_email():
         for i in users_to_send_email:
             recommended_posts = list_recommended_posts_instance(session,i.user)
             serialized_posts = serialize_posts(recommended_posts)
-            # serialized_posts_json = json.dumps(serialized_posts)
-            print(serialize_posts)
-            message = Mail(
-                from_email=FROM_EMAIL,
-                to_emails= i.user.email,
-                subject="Your Daily Recommended Posts",
-            )
-            message.dynamic_template_data = {
-                "posts" : serialize_posts,
-            }
-            message.template_id = SENDGRID_TEMPLATE_POST_RECOMMENDATION
-            try:
-                print("SENDGRID_API_KEY:", SENDGRID_POST_RECOMMENDATION_API_KEY)
-                sg = SendGridAPIClient(SENDGRID_POST_RECOMMENDATION_API_KEY)
-                response = sg.send(message)
-                print(f"Email sent successfully! Status code: {response.status_code}")
-                print(response.body)
-            except Exception as e:
-                print(f"Error sending email: {e}")
+            serialized_posts_json = json.dumps(serialized_posts)
+            
+            print(serialized_posts_json)
+
+            # message = Mail(
+            #     from_email=FROM_EMAIL,
+            #     to_emails= i.user.email,
+            #     subject="Your Daily Recommended Posts",
+            # )
+            # message.dynamic_template_data = {
+            #     "posts" : serialized_posts_json,
+            # }
+            # message.template_id = SENDGRID_TEMPLATE_POST_RECOMMENDATION
+            # try:
+            #     print("SENDGRID_API_KEY:", SENDGRID_POST_RECOMMENDATION_API_KEY)
+            #     sg = SendGridAPIClient(SENDGRID_POST_RECOMMENDATION_API_KEY)
+            #     response = sg.send(message)
+            #     print(f"Email sent successfully! Status code: {response.status_code}")
+            #     print(response.body)
+            # except Exception as e:
+            #     print(f"Error sending email: {e}")
 
 
 

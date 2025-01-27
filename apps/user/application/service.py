@@ -75,15 +75,15 @@ async def user_profile_update_application(
     bio: str | None,
     is_private_account: bool | None,
     session: SessionDep,
-    files: Optional[List[UploadFile]] | None,
     current_user: Users,
+    files: Optional[List[UploadFile]] | None,
 ):
     """
     Application layer service for updating user profile
     """
 
     return await user_profile_update_instance(
-        bio, is_private_account, session, files, current_user
+        bio, is_private_account, session, files, current_user,
     )
 
 
