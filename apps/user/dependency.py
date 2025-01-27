@@ -123,3 +123,17 @@ def remove_object_from_minio(bucket_name: str, object_name: list):
 class ConnectionResponse(Enum):
     ACCEPT = "accept"
     REJECT = "reject"
+
+
+def validate_password(value):
+        if not any(c.isdigit() for c in value):
+            raise ValueError("Password must contain at least one digit.")
+        if not any(c.islower() for c in value):
+            raise ValueError("Password must contain at least one lowercase letter.")
+        if not any(c.isupper() for c in value):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        if not any(c in "@#$%^&+=" for c in value):
+            raise ValueError(
+                "Password must contain at least one special character (@#$%^&+=)."
+            )
+        return value

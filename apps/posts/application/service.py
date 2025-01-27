@@ -1,4 +1,5 @@
 from fastapi import Depends, UploadFile
+from typing import Optional
 from apps.posts.domain.service import (
     create_post_instance,
     list_posts_instance,
@@ -22,7 +23,7 @@ def create_post_application(
     title: str,
     content: str,
     current_user: Users,
-    file: UploadFile | None = None,
+    file: Optional[UploadFile],
 ):
     """
     Application layer service for creating post

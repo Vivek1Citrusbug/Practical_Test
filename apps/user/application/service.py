@@ -1,6 +1,6 @@
 from typing import Annotated, List, Optional
 
-from fastapi import Depends, UploadFile
+from fastapi import Depends, UploadFile, Request
 from database import Session
 from apps.user.application.schemas import UserCreateModel, UserProfileCreate
 from apps.user.domain.models import Users
@@ -20,6 +20,8 @@ from apps.user.domain.service import (
     get_following_instance,
     unfollow_user_instance,
     remove_follower_instance,
+    create_checkout_session_instance,
+    stripe_webhook_instance,
 )
 from database import SessionDep
 from apps.user.dependency import ConnectionResponse
@@ -73,15 +75,15 @@ async def user_profile_update_application(
     bio: str | None,
     is_private_account: bool | None,
     session: SessionDep,
-    files: Optional[List[UploadFile]] | None,
     current_user: Users,
+    files: Optional[List[UploadFile]] | None,
 ):
     """
     Application layer service for updating user profile
     """
 
     return await user_profile_update_instance(
-        bio, is_private_account, session, files, current_user
+        bio, is_private_account, session, files, current_user,
     )
 
 
@@ -189,3 +191,17 @@ async def remove_follower_application(
     """
 
     return await remove_follower_instance(username, session, current_user)
+
+async def create_checkout_session_application(amount:int,session:SessionDep):
+    """
+    Application layer service for creating checkout session
+    """
+    
+    return await create_checkout_session_instance(amount,session)
+
+async def stripe_webhook_application(request: Request,db_session: SessionDep):
+    """
+    Application layer service for handling webhook event
+    """
+
+    return await stripe_webhook_instance(request,db_session)

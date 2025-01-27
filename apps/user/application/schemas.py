@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel, Field
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 #############################
@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr
 
 
 class UserBaseModel(SQLModel):
-    username: str = Field(unique=True,nullable=False)
+    username: str = Field(unique=True, nullable=False)
     name: str | None = Field(default=None)
     first_name: str | None = Field(default=None)
     last_name: str | None = Field(default=None)
@@ -25,16 +25,65 @@ class UserPublicModel(SQLModel):
 
 
 class UserCreateModel(SQLModel):
-    username: str = Field(max_length=20,min_length=5, schema_extra={'pattern': r'^[a-zA-Z0-9]+$'})
-    name: str = Field(max_length=20,min_length=5, schema_extra={'pattern': r"^[a-zA-Z\s]+$"})
-    first_name: str = Field(max_length=20,min_length=5,schema_extra={'pattern': r"^[a-zA-Z]+$"})
-    last_name: str = Field(max_length=20,min_length=5,schema_extra={'pattern': r"^[a-zA-Z]+$"} )
+    username: str = Field(
+        max_length=20,
+        min_length=5,
+    )
+    name: str = Field(
+        max_length=20,
+        min_length=5,
+    )
+    first_name: str = Field(
+        max_length=20,
+        min_length=5,
+    )
+    last_name: str = Field(
+        max_length=20,
+        min_length=5,
+    )
     email: EmailStr
-    password: str = Field(max_length=20,min_length=8,schema_extra={'pattern': r"^[A-Za-z0-9@#$%^&+=]{8,}"})
+    password: str = Field(
+        max_length=20,
+        min_length=8,
+    )
+
+    @field_validator("username")
+    def validate_username(cls, value):
+        if not value.isalnum():
+            raise ValueError("Username can only contain alphanumeric characters.")
+        return value
+
+    @field_validator("name")
+    def validate_name(cls, value):
+        if not all(c.isalpha() or c.isspace() for c in value):
+            raise ValueError("Name can only contain letters and spaces.")
+        return value
+
+    @field_validator("first_name", "last_name")
+    def validate_name_fields(cls, value, info):
+        if not value.isalpha():
+            raise ValueError(
+                f"{info.field_name.replace('_', ' ').title()} can only contain letters."
+            )
+        return value
+
+    @field_validator("password")
+    def validate_password(cls, value):
+        if not any(c.isdigit() for c in value):
+            raise ValueError("Password must contain at least one digit.")
+        if not any(c.islower() for c in value):
+            raise ValueError("Password must contain at least one lowercase letter.")
+        if not any(c.isupper() for c in value):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        if not any(c in "@#$%^&+=" for c in value):
+            raise ValueError(
+                "Password must contain at least one special character (@#$%^&+=)."
+            )
+        return value
 
 
 class UserProfileCreate(SQLModel):
-    bio: str | None = Field(default=None,max_length=30)
+    bio: str | None = Field(default=None, max_length=30)
     is_private_account: bool
 
 
@@ -57,5 +106,3 @@ class TokenData(SQLModel):
 
 class PasswordResetRequest(BaseModel):
     email: EmailStr
-
-

@@ -1,10 +1,11 @@
 import os
 import uuid
-from datetime import datetime, timedelta, timezone,UTC
-from fastapi import HTTPException, UploadFile, status
+import stripe
+from datetime import datetime, timedelta, timezone, UTC
+from fastapi import HTTPException, UploadFile, status, Request
 import httpx
 from passlib.context import CryptContext
-from apps.user.dependency import upload_to_minio,remove_object_from_minio
+from apps.user.dependency import upload_to_minio, remove_object_from_minio
 from config import (
     ALGORITHM,
     GITHUB_CLIENT_ID,
@@ -22,7 +23,10 @@ from config import (
     ADMIN_LASTNAME,
     ADMIN_NAME,
     ADMIN_PASSWORD,
-    MINIO_PROFILE_PICTURE_BUCKET
+    MINIO_PROFILE_PICTURE_BUCKET,
+    STRIPE_FAILURE_URL,
+    STRIPE_SUCCESS_URL,
+    STRIPE_ENDPOINT_SECRET_KEY,
 )
 from apps.user.dependency import (
     verify_password,
@@ -31,14 +35,21 @@ from apps.user.dependency import (
     verify_reset_token,
 )
 import jwt
-from apps.user.dependency import ConnectionResponse
+from apps.user.dependency import ConnectionResponse,validate_password
 from database import SessionDep
 from fastapi import Depends
-from typing import Annotated, List,Optional
+from typing import Annotated, List, Optional
 from database import Session
 from apps.user.application.schemas import UserCreateModel, UserProfileCreate
-from apps.user.domain.models import Users, Profile, Connections
+from apps.user.domain.models import (
+    Users,
+    Profile,
+    Connections,
+    Transaction,
+    Subscription,
+)
 from sqlmodel import SQLModel, select
+from sqlalchemy.exc import SQLAlchemyError
 from database import engine
 from apps.user.application.schemas import TokenData
 from fastapi.security import OAuth2PasswordBearer
@@ -275,12 +286,12 @@ async def password_reset_confirm_instance(
     Service for Creating reset password token
     """
     statement = select(Users).where(Users.username == user)
-    current_user:Users = session.exec(statement).first()
+    current_user: Users = session.exec(statement).first()
 
     email = verify_reset_token(current_user.password_reset_token)
     if email is None:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
-
+    validate_password(new_password)
     current_user.password = get_password_hash(new_password)
     session.add(current_user)
     session.commit()
@@ -312,50 +323,57 @@ async def user_profile_delete_instance(
 
 
 async def user_profile_update_instance(
-    bio:str,
-    is_private_account:bool,
-    session: SessionDep, 
-    files:  Optional[List[UploadFile]],  
-    current_user: Users
+    bio: str | None,
+    is_private_account: bool | None,
+    session: SessionDep,
+    files: Optional[List[UploadFile]],
+    current_user: Users,
 ):
     """
     Domain layer Service for updating user profile
     """
 
-    profile = session.exec(select(Profile).where(Profile.username == current_user.username)).first()
-    
+    profile = session.exec(
+        select(Profile).where(Profile.username == current_user.username)
+    ).first()
+
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
     profile.bio = bio if bio is not None else profile.bio
-    allowed_extensions = {"jpg", "jpeg", "png", "gif", "mp4", "mkv", "avi", "mov"} 
+    
+    allowed_extensions = {"jpg", "jpeg", "png", "gif", "mp4", "mkv", "avi", "mov"}
+    
     file_urls = []
+    
     print("inside update profile instance")
     if files:
         for file in files:
-            file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
-            
+            file_extension = (
+                file.filename.split(".")[-1].lower() if "." in file.filename else ""
+            )
+
             if file_extension not in allowed_extensions:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Unsupported file type: {file.filename}. Allowed types: {', '.join(allowed_extensions)}"
+                    detail=f"Unsupported file type: {file.filename}. Allowed types: {', '.join(allowed_extensions)}",
                 )
 
-        
-            file_bytes = await file.read()  
-            file_url = upload_to_minio(file_bytes, str(uuid.uuid4()) + "." + file_extension)
+            file_bytes = await file.read()
+            file_url = upload_to_minio(
+                file_bytes, str(uuid.uuid4()) + "." + file_extension
+            )
             file_urls.append(file_url)
 
-
     if len(file_urls):
-        profile.profile_picture=json.dumps(file_urls)
-    
+        profile.profile_picture = json.dumps(file_urls)
+
     profile.is_private_account = (
         is_private_account
         if is_private_account is not None
         else profile.is_private_account
     )
-    
+
     profile.modified_at = datetime.now(timezone.utc)
 
     session.add(profile)
@@ -363,11 +381,12 @@ async def user_profile_update_instance(
     session.refresh(profile)
     return profile
 
+
 async def user_profile_create_instance(
     bio: str,
     is_private_account: bool,
     session: SessionDep,
-    files:  Optional[List[UploadFile]],  
+    files: Optional[List[UploadFile]],
     current_user: Users,
 ):
     """
@@ -383,23 +402,48 @@ async def user_profile_create_instance(
     if existing_profile:
         raise HTTPException(status_code=400, detail="User already has a profile")
 
-    allowed_extensions = {"jpg", "jpeg", "png", "gif", "mp4", "mkv", "avi", "mov"} 
+    allowed_extensions = {"jpg", "jpeg", "png", "gif", "mp4", "mkv", "avi", "mov"}
 
     file_urls = []
+
     if files:
         for file in files:
-            file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
-            
-            if file_extension not in allowed_extensions:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Unsupported file type: {file.filename}. Allowed types: {', '.join(allowed_extensions)}"
+            try:
+                file_extension = (
+                    file.filename.split(".")[-1].lower() if "." in file.filename else ""
                 )
 
-        
-            file_bytes = await file.read()  
-            file_url = upload_to_minio(file_bytes, str(uuid.uuid4()) + "." + file_extension)
-            file_urls.append(file_url)
+                if file_extension not in allowed_extensions:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Unsupported file type: {file.filename}. Allowed types: {', '.join(allowed_extensions)}",
+                    )
+
+                try:
+                    file_bytes = await file.read()
+                except Exception as read_error:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Error reading file {file.filename}: {str(read_error)}",
+                    )
+
+                try:
+                    unique_filename = str(uuid.uuid4()) + "." + file_extension
+                    file_url = upload_to_minio(file_bytes, unique_filename)
+                    file_urls.append(file_url)
+                except Exception as upload_error:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Error uploading file {file.filename}: {str(upload_error)}",
+                    )
+
+            except HTTPException as http_exc:
+                raise http_exc
+            except Exception as generic_error:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"An unexpected error occurred while processing {file.filename}: {str(generic_error)}",
+                )
 
     new_profile = Profile(
         bio=bio,
@@ -407,17 +451,13 @@ async def user_profile_create_instance(
         is_private_account=is_private_account,
         username=current_user.username,
     )
-    
+
     print(new_profile)
     session.add(new_profile)
     session.commit()
     session.refresh(new_profile)
     # schedule_recommendation_email(current_user)
     return new_profile
-
-
-
-
 
 
 async def user_profile_get_instance(username: str, session: SessionDep):
@@ -476,7 +516,7 @@ async def create_connection_instance(
         connection_instance.status = 2 if profile.is_private_account else 1
         session.commit()
         session.refresh(connection_instance)
-        connection_instance.modified_at=datetime.now(timezone.utc)
+        connection_instance.modified_at = datetime.now(timezone.utc)
         return {
             "message": (
                 "Connection request sent"
@@ -489,7 +529,7 @@ async def create_connection_instance(
         connection_instance.status = 0
         session.commit()
         session.refresh(connection_instance)
-        connection_instance.modified_at=datetime.now(timezone.utc)
+        connection_instance.modified_at = datetime.now(timezone.utc)
         return {"message": "Connection request withdrawn"}
 
     return {"message": "User is already connected or followed"}
@@ -511,7 +551,10 @@ async def get_connection_requests_instance(session: SessionDep, current_user: Us
 
 
 async def handle_connection_requests_instance(
-    username: str, response: ConnectionResponse, session: SessionDep, current_user: Users
+    username: str,
+    response: ConnectionResponse,
+    session: SessionDep,
+    current_user: Users,
 ):
     """
     Domain layer service for handling connection requests.
@@ -530,14 +573,14 @@ async def handle_connection_requests_instance(
             connection_requests.status = 1
             session.commit()
             session.refresh(connection_requests)
-            connection_requests.modified_at=datetime.now(timezone.utc)
+            connection_requests.modified_at = datetime.now(timezone.utc)
             return {"message": "request accepted"}
         elif response.value == "reject":
             print("Request rejected")
             connection_requests.status = 0
             session.commit()
             session.refresh(connection_requests)
-            connection_requests.modified_at=datetime.now(timezone.utc)
+            connection_requests.modified_at = datetime.now(timezone.utc)
             return {"message": "request rejected"}
         else:
             return {"message": "Invalid response"}
@@ -594,15 +637,17 @@ async def unfollow_user_instance(
     following.status = 0
     session.commit()
     session.refresh(following)
-    following.modified_at=datetime.now(timezone.utc)
+    following.modified_at = datetime.now(timezone.utc)
     return {"message": f"You unfollowed {username}"}
 
 
-async def remove_follower_instance(username:str,session:SessionDep,current_user:Users):
+async def remove_follower_instance(
+    username: str, session: SessionDep, current_user: Users
+):
     """
     Domain layer service for remioving follower
     """
-    
+
     query = select(Connections).where(
         Connections.follower == username,
         Connections.following == current_user.username,
@@ -612,14 +657,16 @@ async def remove_follower_instance(username:str,session:SessionDep,current_user:
     result = session.exec(query).first()
 
     if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Follower not found")
-    
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Follower not found"
+        )
+
     session.delete(result)
     session.commit()
-    result.modified_at=datetime.now(timezone.utc)
+    result.modified_at = datetime.now(timezone.utc)
     return {"message": f"You removed {username}"}
 
-    
+
 async def create_default_superuser():
     with Session(engine) as session:
         statement = select(Users).where(
@@ -652,26 +699,6 @@ async def create_default_superuser():
         session.add(superuser)
         session.commit()
 
-
-# async def remove_profile_data(user_profile:Profile):
-#     """
-#     Service for deleting profile data from remote cloud storage
-#     """
-#     print(user_profile,type(user_profile))
-#     profile_pictures =  json.loads(user_profile.profile_picture)
-#     print(profile_pictures,type(profile_pictures))
-#     object_collection = []
-#     if profile_pictures:
-#         for i in profile_pictures:
-#             i =  i.split('/')
-#             object_collection.append(i[-1])
-#         print(object_collection)
-#     remove_object_from_minio(MINIO_PROFILE_PICTURE_BUCKET,object_collection)
-
-
-
-
-
 async def remove_profile_data(user_profile: Profile):
     """
     Service for deleting profile data from remote cloud storage.
@@ -685,15 +712,17 @@ async def remove_profile_data(user_profile: Profile):
 
     if profile_picture_data:
         try:
-            profile_pictures = json.loads(profile_picture_data) 
+            profile_pictures = json.loads(profile_picture_data)
             if isinstance(profile_pictures, list):
                 print("Handling multiple profile pictures...")
-                object_collection.extend([pic.split('/')[-1] for pic in profile_pictures])
+                object_collection.extend(
+                    [pic.split("/")[-1] for pic in profile_pictures]
+                )
             else:
                 print("Unexpected JSON format for profile_picture. Expected a list.")
         except json.JSONDecodeError:
             print("Handling a single profile picture...")
-            object_collection.append(profile_picture_data.split('/')[-1])
+            object_collection.append(profile_picture_data.split("/")[-1])
 
         print(f"Objects to be removed: {object_collection}")
 
@@ -702,4 +731,153 @@ async def remove_profile_data(user_profile: Profile):
         print("No profile picture to remove.")
 
 
+async def create_checkout_session_instance(amount: int, session: SessionDep):
+    """
+    Domain layer service for creating checkout session
+    """
 
+    if amount != 500:
+        raise HTTPException(status_code=400, detail="Amount must be $5")
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[
+                {
+                    "price_data": {
+                        "currency": "usd",
+                        "product_data": {"name": "Subscription"},
+                        "unit_amount": amount,
+                    },
+                    "quantity": 1,
+                },
+            ],
+            mode="payment",
+            success_url=STRIPE_SUCCESS_URL
+            + "/after-checkout?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=STRIPE_FAILURE_URL
+            + "/after-checkout?session_id={CHECKOUT_SESSION_ID}",
+        )
+        print(session)
+        return {"checkout_url": session.url}
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=400, detail=f"Error creating checkout session: {str(e)}"
+        )
+
+
+def fulfill_checkout(session_id: str, db_session: SessionDep):
+    """
+    Service for handling database operation after successfull payment 
+    """
+    
+    try:
+
+        checkout_session = stripe.checkout.Session.retrieve(
+            session_id,
+            expand=["line_items"],
+        )
+
+        payment_status = checkout_session.payment_status
+        customer_email = checkout_session.customer_details.email
+        payment_intent_id = checkout_session.payment_intent
+
+        if not customer_email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email not found in payment details",
+            )
+
+        statement = select(Users).where(Users.email == customer_email)
+        user = db_session.exec(statement).first()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
+
+        if payment_status == "paid":
+            subscription = Subscription(
+                username=user.username,
+                type="Paid",
+                amount=float(5),
+                expire_at=datetime.now() + timedelta(days=30),
+                is_active=True,
+                created_at=datetime.now(),
+                modified_at=datetime.now(),
+            )
+            db_session.add(subscription)
+            db_session.commit()
+
+            transaction = Transaction(
+                username=user.username,
+                subscription_id=subscription.id,
+                payment_status="paid",
+                payment_intent_id=payment_intent_id,
+            )
+            db_session.add(transaction)
+            db_session.commit()
+
+            user.is_verified = True
+            
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+
+            print(f"User {user.username} has been verified.")
+
+
+        elif payment_status == "unpaid":
+            transaction = Transaction(
+                username=user.username,
+                payment_status="failed",
+                payment_intent_id=payment_intent_id,
+            )
+            db_session.add(transaction)
+            db_session.commit()
+    
+        elif payment_status == "requires_payment":
+            transaction = Transaction(
+                username=user.username,
+                payment_status="pending",
+                payment_intent_id=payment_intent_id,
+            )
+
+            db_session.add(transaction)
+            db_session.commit()
+            print(f"Monitoring payment status for intent ID: {payment_intent_id}")
+
+        else:
+            print("####### Unknown Payment Status #######")
+
+    except SQLAlchemyError as e:
+            db_session.rollback()
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except Exception as e:
+            raise HTTPException(status_code=400, detail=f"An error occurred: {str(e)}")
+
+async def stripe_webhook_instance(request: Request, db_session: SessionDep):
+    """
+    Domain layer service for handling webhook events
+    """
+
+    payload = await request.body()
+    sig_header = request.headers.get("Stripe-Signature")
+    endpoint_secret = STRIPE_ENDPOINT_SECRET_KEY
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload=payload, sig_header=sig_header, secret=endpoint_secret
+        )
+    except stripe.error.SignatureVerificationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    if (
+        event["type"] == "checkout.session.completed"
+        or event["type"] == "checkout.session.async_payment_succeeded"
+    ):
+        fulfill_checkout(event["data"]["object"]["id"], db_session)
+
+    else:
+        print(f"Unhandled event type: {event['type']}")
+    return {"status": "success"}

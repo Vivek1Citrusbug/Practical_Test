@@ -31,7 +31,7 @@ from config import (
     STRIPE_ENDPOINT_SECRET_KEY,
 )
 from apps.user.application.schemas import Token, UserProfileCreate, UserProfilePublic
-from apps.user.domain.models import Connections,Transaction,Subscription
+from apps.user.domain.models import Connections, Transaction, Subscription
 from fastapi.security import OAuth2PasswordRequestForm
 from database import engine, SessionDep
 from apps.user.domain.service import (
@@ -56,6 +56,8 @@ from apps.user.application.service import (
     get_following_application,
     unfollow_user_application,
     remove_follower_application,
+    create_checkout_session_application,
+    stripe_webhook_application,
 )
 from fastapi import status, File
 
@@ -114,7 +116,7 @@ async def github_callback(code: str, session: SessionDep):
 async def password_reset_request(
     session: SessionDep,
     # current_user: Users = Depends(get_current_user),
-    username:str
+    username: str,
 ):
     return await password_reset_application(session, username)
 
@@ -123,7 +125,7 @@ async def password_reset_request(
 async def password_reset_confirm(
     new_password: str,
     session: SessionDep,
-    username:str,
+    username: str,
     # current_user: Users = Depends(get_current_user),
 ):
 
@@ -151,14 +153,14 @@ async def get_profile(username: str, session: SessionDep):
 
 @router.put("/profiles/{username}/", response_model=UserProfilePublic, tags=["Profile"])
 async def update_profile(
-    bio: str | None,
-    is_private_account: bool | None,
     session: SessionDep,
-    file: Optional[list[UploadFile]] = File(None),
+    bio: str | None = Form(...),
+    is_private_account: bool | None = Form(...),
+    file: Optional[list[UploadFile]] | None= File(None),
     current_user: Users = Depends(get_current_user),
 ):
     return await user_profile_update_application(
-        bio, is_private_account, session, file, current_user
+        bio, is_private_account, session, current_user, file
     )
 
 
@@ -237,52 +239,7 @@ async def remove_follower(
 
 @router.post("/create-checkout-session")
 async def checkout(amount: int, session: SessionDep):
-    if amount != 500:
-        raise HTTPException(status_code=400, detail="Amount must be $5")
-    try:
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            line_items=[
-                {
-                    "price_data": {
-                        "currency": "usd",
-                        "product_data": {"name": "Subscription"},
-                        "unit_amount": amount,
-                    },
-                    "quantity": 1,
-                },
-            ],
-            mode="payment",
-            success_url=STRIPE_SUCCESS_URL+"/after-checkout?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url=STRIPE_FAILURE_URL,
-        )
-
-        print(session)
-        
-        return {"checkout_url": session.url}
-    
-    except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Error creating checkout session: {str(e)}"
-        )
-
-
-
-@router.get("/success/{session_id}")
-async def success(
-    session_id: str,
-    db_session: SessionDep,
-):
-    session = stripe.checkout.Session.retrieve(session_id,expand=['line_items'],)
-    print(session)
-    # user = db_session.get(UserModel, current_user.username)
-    # if user:
-    #     user.is_staff = True
-    #     user.is_superuser = True
-    #     db_session.commit()
-    #     return {"message": "Payment successful, role upgraded to admin."}
-    # else:
-    #     raise HTTPException(status_code=404, detail="User not found")
+    return await create_checkout_session_application(amount, session)
 
 
 @router.post("/webhook")
@@ -290,49 +247,4 @@ async def stripe_webhook(
     request: Request,
     db_session: SessionDep,
 ):
-    payload = await request.body()
-    print("########### Payload #############",payload)
-    sig_header = request.headers.get("Stripe-Signature")
-    print("########### sig header #############",sig_header)
-    endpoint_secret = STRIPE_ENDPOINT_SECRET_KEY
-    
-    try:
-        event = stripe.Webhook.construct_event(
-            payload=payload, sig_header=sig_header, secret=endpoint_secret
-        )
-    except stripe.error.SignatureVerificationError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-    if event["type"] in [
-        "payment_intent.succeeded",
-        "charge.succeeded",
-        "checkout.session.completed",
-    ]:
-        payment_obj = event["data"]["object"]
-        customer_email = payment_obj.get("billing_details", {}).get("email")
-        if not customer_email:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email not found in payment details",
-            )
-
-        statement = select(Users).where(Users.email == customer_email)
-        user = db_session.exec(statement).first()
-
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-            )
-
-        user.is_staff = True
-        user.is_superuser = True
-
-        db_session.add(user)
-        db_session.commit()
-
-        # # schedule task for the eta
-        # revert_user_role.apply_async(args=[user.email], eta=user.expiration_time)
-
-    else:
-        print(f"Unhandled event type: {event['type']}")
-    return {"status": "success"}
+    return await stripe_webhook_application(request, db_session)

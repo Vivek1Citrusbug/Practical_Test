@@ -1,7 +1,8 @@
 import random
+from typing import Optional
 import uuid
 from sqlmodel import select
-from datetime import datetime, timezone
+from datetime import datetime, timezone,UTC
 from apps.posts.domain.models import Posts, Likes, Comments, ReportedPosts
 from database import SessionDep
 from fastapi import FastAPI, HTTPException, UploadFile, Form, Depends, APIRouter, status
@@ -33,7 +34,7 @@ def create_post_instance(
     title: str,
     content: str,
     current_user: Users,
-    file: UploadFile | None = None,
+    file: Optional[UploadFile],
 ):
     """
     Domain layer service for creating post
@@ -90,7 +91,8 @@ def list_posts_instance(
     if username:
         query = query.where(Posts.post_by == username)
     else:
-        query = query.where(Posts.post_by.in_(followings))
+        if not current_user.is_verified:
+            query = query.where(Posts.post_by.in_(followings))
 
     query = query.offset(skip).limit(limit)
 
@@ -211,17 +213,23 @@ def report_post_instance(
             detail="You are not authorized to perform this task.",
         )
 
-    followings = get_followers(session, current_user)
-
-    if post.post_by not in followings:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Post not found",
-        )
-
-    reporting_post = ReportedPosts(
+    if current_user.is_verified:
+        reporting_post = ReportedPosts(
         post=post.id, post_by=post.post_by, reported_by=current_user.username
     )
+    else:
+        
+        followings = get_followers(session, current_user)
+
+        if post.post_by not in followings:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="You must follow the post author to report post.",
+            )
+
+        reporting_post = ReportedPosts(
+            post=post.id, post_by=post.post_by, reported_by=current_user.username
+        )
 
     session.add(reporting_post)
     session.commit()
@@ -244,14 +252,17 @@ def create_comment_instance(
 
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
+    
+    if current_user.is_verified:
+        comment = Comments(post=post_id, content=content, comment_by=current_user.username)
+    else:
+        followings = get_followers(session, current_user)
+        followings.append(current_user.username)
 
-    followings = get_followers(session, current_user)
-    followings.append(current_user.username)
+        if post.post_by not in followings:
+            raise HTTPException(status_code=404, detail="You must follow the post author to create comment.")
 
-    if post.post_by not in followings:
-        raise HTTPException(status_code=404, detail="Post not found")
-
-    comment = Comments(post=post_id, content=content, comment_by=current_user.username)
+        comment = Comments(post=post_id, content=content, comment_by=current_user.username)
 
     session.add(comment)
     session.commit()
@@ -273,14 +284,18 @@ def list_comments_instance(
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    followings = get_followers(session, current_user)
-    followings.append(current_user.username)
+    if current_user.is_verified:
+        query = select(Comments).where(Comments.post == post_id)
+        comments = session.exec(query).all()
+    else:
+        followings = get_followers(session, current_user)
+        followings.append(current_user.username)
 
-    if post.post_by not in followings:
-        raise HTTPException(status_code=404, detail="Post not found")
+        if post.post_by not in followings:
+            raise HTTPException(status_code=404, detail="You must follow the post author to list comments.")
 
-    query = select(Comments).where(Comments.post == post_id)
-    comments = session.exec(query).all()
+        query = select(Comments).where(Comments.post == post_id)
+        comments = session.exec(query).all()
 
     if not comments:
         return []
@@ -298,30 +313,36 @@ def update_comment_instance(
     """
     Domain layer service for updating comment
     """
-    query = select(Posts).where(Posts.id == post_id)
-    post: Posts = session.exec(query).first()
-
+    post = session.exec(select(Posts).where(Posts.id == post_id)).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    followings = get_followers(session, current_user)
-    followings.append(current_user.username)
+    if current_user.is_verified:
+        query = select(Comments).where(
+            Comments.post == post_id,
+            Comments.id == comment_id,
+            Comments.comment_by == current_user.username,
+        )
+    else:
+        followings = get_followers(session, current_user)
+        followings.append(current_user.username) 
+        
+        if post.post_by not in followings:
+            raise HTTPException(status_code=404, detail="You must follow the post author to update comment.")
 
-    if post.post_by not in followings:
-        raise HTTPException(status_code=404, detail="Post not found")
+        query = select(Comments).where(
+            Comments.post == post_id,
+            Comments.id == comment_id,
+            Comments.comment_by == current_user.username,
+        )
 
-    query = select(Comments).where(
-        Comments.post == post_id,
-        Comments.id == comment_id,
-        Comments.comment_by == current_user.username,
-    )
     comment = session.exec(query).first()
-
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
 
     comment.content = content if content else comment.content
-    comment.modified_at = datetime.now(timezone.utc)
+    comment.modified_at = datetime.now(UTC)
+
     session.commit()
     return comment
 
@@ -341,12 +362,13 @@ def delete_comment_instance(
 
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
+    
+    if not current_user.is_verified:
+        followings = get_followers(session, current_user)
+        followings.append(current_user.username)
 
-    followings = get_followers(session, current_user)
-    followings.append(current_user.username)
-
-    if post.post_by not in followings:
-        raise HTTPException(status_code=404, detail="Post not found")
+        if post.post_by not in followings:
+            raise HTTPException(status_code=404, detail="You must follow the post author to delete comment.")
 
     query = select(Comments).where(
         Comments.post == post_id,
@@ -354,7 +376,10 @@ def delete_comment_instance(
     )
 
     comment = session.exec(query).first()
-
+    
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    
     if comment.comment_by != current_user.username and not (
         current_user.is_staff or current_user.is_superuser
     ):
@@ -382,11 +407,12 @@ def create_like_instance(
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    followings = get_followers(session, current_user)
-    followings.append(current_user.username)
+    if not current_user.is_verified:
+        followings = get_followers(session, current_user)
+        followings.append(current_user.username)
 
-    if post.post_by not in followings:
-        raise HTTPException(status_code=404, detail="Post not found")
+        if post.post_by not in followings:
+            raise HTTPException(status_code=404, detail="You must follow the post author to like this post.")
 
     query = select(Likes).where(
         (Likes.post == post_id) & (Likes.liked_by == current_user.username)
