@@ -19,3 +19,10 @@ def get_session():
 SessionDep = Annotated[Session, Depends(get_session)]
 
 base = declarative_base()
+
+def get_db():
+    db = SessionDep()
+    try:
+        yield db
+    finally:
+        db.close()
