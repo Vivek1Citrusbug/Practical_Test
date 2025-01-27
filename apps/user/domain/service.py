@@ -35,7 +35,7 @@ from apps.user.dependency import (
     verify_reset_token,
 )
 import jwt
-from apps.user.dependency import ConnectionResponse
+from apps.user.dependency import ConnectionResponse,validate_password
 from database import SessionDep
 from fastapi import Depends
 from typing import Annotated, List, Optional
@@ -291,7 +291,7 @@ async def password_reset_confirm_instance(
     email = verify_reset_token(current_user.password_reset_token)
     if email is None:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
-
+    validate_password(new_password)
     current_user.password = get_password_hash(new_password)
     session.add(current_user)
     session.commit()

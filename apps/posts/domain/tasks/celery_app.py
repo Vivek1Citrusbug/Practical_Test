@@ -41,14 +41,16 @@ def serialize_posts(posts:list[Posts]):
     """
     Converts a list of Posts objects to a list of dictionaries.
     """
-    return [
-        {
-            "title": post.title,
-            "content": post.content,
-            "file_url": post.file_url
-        }
-        for post in posts
-    ]
+    return {
+        "posts": [
+            {
+                "title": post.title,
+                "content": post.content,
+                "file_url": post.file_url,
+            }
+            for post in posts
+        ]
+    }
 
 @celery_app.task
 def send_post_recommendation_email():
@@ -66,23 +68,23 @@ def send_post_recommendation_email():
             
             print(serialized_posts_json)
 
-            # message = Mail(
-            #     from_email=FROM_EMAIL,
-            #     to_emails= i.user.email,
-            #     subject="Your Daily Recommended Posts",
-            # )
-            # message.dynamic_template_data = {
-            #     "posts" : serialized_posts_json,
-            # }
-            # message.template_id = SENDGRID_TEMPLATE_POST_RECOMMENDATION
-            # try:
-            #     print("SENDGRID_API_KEY:", SENDGRID_POST_RECOMMENDATION_API_KEY)
-            #     sg = SendGridAPIClient(SENDGRID_POST_RECOMMENDATION_API_KEY)
-            #     response = sg.send(message)
-            #     print(f"Email sent successfully! Status code: {response.status_code}")
-            #     print(response.body)
-            # except Exception as e:
-            #     print(f"Error sending email: {e}")
+            message = Mail(
+                from_email=FROM_EMAIL,
+                to_emails= i.user.email,
+                subject="Your Daily Recommended Posts",
+            )
+            message.dynamic_template_data = {
+                "recommendation" : serialized_posts_json,
+            }
+            message.template_id = SENDGRID_TEMPLATE_POST_RECOMMENDATION
+            try:
+                print("SENDGRID_API_KEY:", SENDGRID_POST_RECOMMENDATION_API_KEY)
+                sg = SendGridAPIClient(SENDGRID_POST_RECOMMENDATION_API_KEY)
+                response = sg.send(message)
+                print(f"Email sent successfully! Status code: {response.status_code}")
+                print(response.body)
+            except Exception as e:
+                print(f"Error sending email: {e}")
 
 
 
