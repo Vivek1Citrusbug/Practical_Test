@@ -1,32 +1,22 @@
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
-from main import app
-from database import base
+from sqlmodel import SQLModel, create_engine, Session
+from main import app  # Import your FastAPI app
+from database import get_session
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+TEST_SQLITE_URL = "sqlite:///./test_blogpost_database.db"
+test_engine = create_engine(TEST_SQLITE_URL, connect_args={"check_same_thread": False})
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-def get_db():
-    db = TestingSessionLocal()
-    try:
-        yield db  
-    finally:
-        db.close()  
-        
 @pytest.fixture()
 def session():
-
-    base.metadata.drop_all(bind=engine)
-    base.metadata.create_all(bind=engine)
+    SQLModel.metadata.drop_all(bind=test_engine)
+    SQLModel.metadata.create_all(bind=test_engine)
 
     db = TestingSessionLocal()
-
     try:
         yield db
     finally:
@@ -35,12 +25,10 @@ def session():
 
 @pytest.fixture()
 def client(session):
-    def override_get_db():
-        try:
-            yield session
-        finally:
-            session.close()
+    def override_get_session():
+        with session as db_session:
+            yield db_session
 
-    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_session] = override_get_session
 
     yield TestClient(app)
