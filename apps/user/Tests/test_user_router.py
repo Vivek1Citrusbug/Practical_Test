@@ -1,3 +1,4 @@
+from io import BytesIO
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -69,16 +70,39 @@ def test_password_reset_request(mock_password_reset_application, client):
 
 
 
-@patch("apps.user.interface.user_router.user_profile_create_application")
-def test_user_profile_create(mock_user_profile_create_application, client):
-    mock_user_profile_create_application.return_value = {
-        "bio": "test bio",
-        "profile_picture":"path-to-minio-server",
-        "is_private_account":True,
-        "created_at":"date",
-    }
+# @patch("apps.user.interface.user_router.user_profile_create_application")
+# def test_user_profile_create(mock_user_profile_create_application, client):
+#     mock_user_profile_create_application.return_value = {
+#         "bio": "test bio",
+#         "profile_picture":"path-to-minio-server",
+#         "is_private_account":True,
+#         "created_at":"date",
+#     }
+#     response = client.post(
+#         "/auth/password-reset/testuser/", params={"username": "testuser"}
+#     )
+#     assert response.status_code == 200
+#     assert response.json() == {"message": "Password reset email sent"}
+
+
+def test_create_profile_success(mock_get_current_user, mock_user_profile_data,client):
+    file_data = BytesIO(b"file_content")
+    file_data.name = "test_image.jpg"
+    
     response = client.post(
-        "/auth/password-reset/testuser/", params={"username": "testuser"}
+        "/auth/profiles/",
+        files={"file": ("test_image.jpg", file_data, "image/jpeg")},
+        data={
+            "bio": mock_user_profile_data["bio"],
+            "is_private_account": mock_user_profile_data["is_private_account"],
+        },
+        headers={"Authorization": f"Bearer mock_token"},
     )
+
     assert response.status_code == 200
-    assert response.json() == {"message": "Password reset email sent"}
+    data = response.json()
+    assert "bio" in data
+    assert data["bio"] == mock_user_profile_data["bio"]
+    assert "is_private_account" in data
+    assert data["is_private_account"] == mock_user_profile_data["is_private_account"]
+

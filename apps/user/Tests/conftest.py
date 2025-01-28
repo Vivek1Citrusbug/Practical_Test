@@ -102,7 +102,7 @@ mock_user = {
 }
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def mock_get_current_user():
     return {
         "id": 1,
@@ -118,5 +118,12 @@ def mock_get_current_user():
         "created_at": "2025-01-27 05:45:40.139548+00:00",
         "modified_at": "2025-01-27 05:45:40.139548+00:00",
         "is_active": True,
+    }
+
+@pytest.fixture(scope="module")
+def mock_user_profile_data():
+    return {
+        "bio": "This is a test bio",
+        "is_private_account": False,
     }
 
