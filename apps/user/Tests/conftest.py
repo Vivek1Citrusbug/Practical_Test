@@ -1,3 +1,4 @@
+from httpx import patch
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
@@ -99,4 +100,23 @@ mock_user = {
     "modified_at": "2025-01-27 05:45:40.139548+00:00",
     "is_active": True,
 }
+
+
+@pytest.fixture
+def mock_get_current_user():
+    return {
+        "id": 1,
+        "username": "testuser",
+        "firstname": "testuserfirstname",
+        "lastname": "testuserlastname",
+        "is_superuser": True,
+        "is_staff": True,
+        "email": "testuser@example.com",
+        "password": "13November200@",
+        "password_reset_token": "$2b$12$DpW5KsltB0SO39qlB8ERJu8ytF3FHWxtOQ2.EEqbBNp0Iba.S.h4G",
+        "is_verified": True,
+        "created_at": "2025-01-27 05:45:40.139548+00:00",
+        "modified_at": "2025-01-27 05:45:40.139548+00:00",
+        "is_active": True,
+    }
 
