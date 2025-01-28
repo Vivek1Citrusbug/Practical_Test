@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from main import app
-from database import base, get_db
+from database import base
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
@@ -12,7 +12,13 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-
+def get_db():
+    db = TestingSessionLocal()
+    try:
+        yield db  
+    finally:
+        db.close()  
+        
 @pytest.fixture()
 def session():
 
@@ -29,10 +35,8 @@ def session():
 
 @pytest.fixture()
 def client(session):
-
     def override_get_db():
         try:
-
             yield session
         finally:
             session.close()

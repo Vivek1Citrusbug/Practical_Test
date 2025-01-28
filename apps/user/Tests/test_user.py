@@ -14,7 +14,6 @@ test_user_data = {
 }
 
 
-
 def test_register_user(client):
     response = client.post("/auth/register", json= test_user_data)
     assert response.status_code == 201
