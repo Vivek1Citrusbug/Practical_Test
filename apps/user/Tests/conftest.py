@@ -32,3 +32,50 @@ def client(session):
     app.dependency_overrides[get_session] = override_get_session
 
     yield TestClient(app)
+
+
+@pytest.fixture
+def valid_user_data():
+    return {
+        "username": "viveksoniii",
+        "name": "viveksoni",
+        "first_name": "vivesonoi",
+        "last_name": "strsdsdving",
+        "email": "user@example.com",
+        "password": "13November200@",
+    }
+
+
+@pytest.fixture
+def invalid_user_data_missing_username():
+    return {
+        "name": "viveksoni",
+        "first_name": "vivek",
+        "last_name": "soni",
+        "email": "viveksoni@example.com",
+        "password": "13November200@",
+    }
+
+
+@pytest.fixture
+def invalid_user_data_invalid_email():
+    return {
+        "username": "viveksoniii",
+        "name": "viveksoni",
+        "first_name": "vivek",
+        "last_name": "soni",
+        "email": "invalid-email-format",
+        "password": "13November200@",
+    }
+
+
+@pytest.fixture
+def invalid_user_data_weak_password():
+    return {
+        "username": "viveksoniii",
+        "name": "viveksoni",
+        "first_name": "vivek",
+        "last_name": "soni",
+        "email": "viveksoni@example.com",
+        "password": "12345",
+    }
