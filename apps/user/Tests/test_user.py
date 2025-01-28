@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import patch
 
+
 def test_register_user(client, valid_user_data):
     response = client.post("/auth/register", json=valid_user_data)
     assert response.status_code == 200
@@ -33,7 +34,15 @@ def test_register_user_weak_password(client, invalid_user_data_weak_password):
     assert "detail" in response_json
     assert "password" in str(response_json["detail"])
 
+def test_github_login(client):
+    response = client.get("/auth/github/login")
+    assert response.status_code == 200
+    assert "auth_url" in response.json()
+    assert "https://github.com/login/oauth/authorize" in response.json()["auth_url"]
 
-valid_username = "viveksoniii"
-invalid_username = "nonexistentuser"
-
+@patch("apps.user.interface.user_router.github_callback_application")  # Mock the application layer service
+def test_github_callback(mock_github_callback_application,client):
+    mock_github_callback_application.return_value = {"jwt_token": "fake_token", "user": {"login": "test_user"}}
+    response = client.get("/auth/github/callback?code=fake_code")
+    assert response.status_code == 200
+    assert response.json() == {"jwt_token": "fake_token", "user": {"login": "test_user"}}

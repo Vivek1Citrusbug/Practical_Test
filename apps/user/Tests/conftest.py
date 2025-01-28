@@ -4,6 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel, create_engine, Session
 from main import app  # Import your FastAPI app
 from database import get_session
+from unittest.mock import AsyncMock, MagicMock
 
 TEST_SQLITE_URL = "sqlite:///./test_blogpost_database.db"
 test_engine = create_engine(TEST_SQLITE_URL, connect_args={"check_same_thread": False})
@@ -79,3 +80,23 @@ def invalid_user_data_weak_password():
         "email": "viveksoni@example.com",
         "password": "12345",
     }
+
+
+# Mock dependencies
+mock_session = MagicMock()
+mock_user = {
+    "id": 1,
+    "username": "testuser",
+    "firstname": "testuserfirstname",
+    "lastname": "testuserlastname",
+    "is_superuser": True,
+    "is_staff": True,
+    "email": "testuser@example.com",
+    "password": "13November200@",
+    "password_reset_token": "$2b$12$DpW5KsltB0SO39qlB8ERJu8ytF3FHWxtOQ2.EEqbBNp0Iba.S.h4G",
+    "is_verified": True,
+    "created_at": "2025-01-27 05:45:40.139548+00:00",
+    "modified_at": "2025-01-27 05:45:40.139548+00:00",
+    "is_active": True,
+}
+
