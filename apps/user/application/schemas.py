@@ -1,4 +1,4 @@
-from typing import Generic, Optional, TypeVar
+from typing import Generic, List, Optional, TypeVar
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel, EmailStr, field_validator
 
