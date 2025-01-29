@@ -2,6 +2,8 @@ from io import BytesIO
 import pytest
 from unittest.mock import MagicMock, patch
 
+from apps.user.application.schemas import UserProfilePublic
+
 
 def test_register_user(client, valid_user_data):
     response = client.post("/auth/register", json=valid_user_data)
@@ -69,26 +71,22 @@ def test_password_reset_request(mock_password_reset_application, client):
     assert response.json() == {"message": "Password reset email sent"}
 
 
-
-# @patch("apps.user.interface.user_router.user_profile_create_application")
-# def test_user_profile_create(mock_user_profile_create_application, client):
-#     mock_user_profile_create_application.return_value = {
-#         "bio": "test bio",
-#         "profile_picture":"path-to-minio-server",
-#         "is_private_account":True,
-#         "created_at":"date",
-#     }
-#     response = client.post(
-#         "/auth/password-reset/testuser/", params={"username": "testuser"}
-#     )
-#     assert response.status_code == 200
-#     assert response.json() == {"message": "Password reset email sent"}
-
-
-def test_create_profile_success(mock_get_current_user, mock_user_profile_data,client):
+@patch("apps.user.interface.user_router.user_profile_create_application")
+def test_create_profile_success(
+    mock_user_profile_create_application,
+    mock_get_current_user,
+    mock_user_profile_data,
+    client,
+    valid_jwt_token,
+):
     file_data = BytesIO(b"file_content")
     file_data.name = "test_image.jpg"
-    
+    mock_user_profile_create_application.return_value = {
+        "bio": "This is a test bio",
+        "is_private_account": True,
+        "profile_picture": "test_image.jpg",
+        "created_at": "2025-01-27 05:45:40.139548+00:00",
+    }
     response = client.post(
         "/auth/profiles/",
         files={"file": ("test_image.jpg", file_data, "image/jpeg")},
@@ -96,7 +94,7 @@ def test_create_profile_success(mock_get_current_user, mock_user_profile_data,cl
             "bio": mock_user_profile_data["bio"],
             "is_private_account": mock_user_profile_data["is_private_account"],
         },
-        headers={"Authorization": f"Bearer mock_token"},
+        headers={"Authorization": f"Bearer {valid_jwt_token.access_token}"},
     )
 
     assert response.status_code == 200
@@ -106,5 +104,18 @@ def test_create_profile_success(mock_get_current_user, mock_user_profile_data,cl
     assert "is_private_account" in data
     assert data["is_private_account"] == mock_user_profile_data["is_private_account"]
 
-    
+
+@patch("apps.user.interface.user_router.user_profile_get_application")
+def test_get_profile_success(mock_user_profile_get_application, client):
+    mock_user_profile_get_application.return_value = {
+        "bio": "This is a test bio",
+        "is_private_account": True,
+        "profile_picture": "test_image.jpg",
+        "created_at": "2025-01-27 05:45:40.139548+00:00",
+    }
+    response = client.get("/auth/profiles/testuser/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["bio"] == "This is a test bio"
+    assert data["is_private_account"] is True
 

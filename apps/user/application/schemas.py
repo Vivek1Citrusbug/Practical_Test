@@ -1,3 +1,4 @@
+from typing import Generic, Optional, TypeVar
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -106,3 +107,11 @@ class TokenData(SQLModel):
 
 class PasswordResetRequest(BaseModel):
     email: EmailStr
+
+
+T = TypeVar("T")
+
+class BaseResponse(BaseModel, Generic[T]):
+    success: bool
+    message: str
+    data: Optional[T] = None

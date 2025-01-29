@@ -40,7 +40,7 @@ from database import SessionDep
 from fastapi import Depends
 from typing import Annotated, List, Optional
 from database import Session
-from apps.user.application.schemas import UserCreateModel, UserProfileCreate
+from apps.user.application.schemas import UserCreateModel, UserProfileCreate, UserProfilePublic
 from apps.user.domain.models import (
     Users,
     Profile,
@@ -51,7 +51,7 @@ from apps.user.domain.models import (
 from sqlmodel import SQLModel, select
 from sqlalchemy.exc import SQLAlchemyError
 from database import engine
-from apps.user.application.schemas import TokenData
+from apps.user.application.schemas import TokenData,BaseResponse
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from sendgrid import SendGridAPIClient
@@ -194,7 +194,7 @@ async def register_user_instance(user_data: UserCreateModel, session: Session):
     session.commit()
     session.refresh(UserDatabase)
 
-    return UserDatabase
+    return  BaseResponse(success=True,data=UserDatabase,message="User registrered successfully!")   
 
 
 async def github_callback_instance(code: str, session: SessionDep):
@@ -262,9 +262,13 @@ async def password_reset_instance(session: SessionDep, user: str):
     """
     Service for Creating reset password token
     """
+
     statement = select(Users).where(Users.username == user)
     current_user = session.exec(statement).first()
-
+    
+    if not current_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
     token = create_reset_token(current_user.email)
     current_user.password_reset_token = token
     current_user.modified_at = datetime.now(timezone.utc)
@@ -287,11 +291,17 @@ async def password_reset_confirm_instance(
     """
     statement = select(Users).where(Users.username == user)
     current_user: Users = session.exec(statement).first()
-
+    
+    if not current_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
     email = verify_reset_token(current_user.password_reset_token)
+    
     if email is None:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
+    
     validate_password(new_password)
+
     current_user.password = get_password_hash(new_password)
     session.add(current_user)
     session.commit()
@@ -460,10 +470,10 @@ async def user_profile_create_instance(
 
 
 async def user_profile_get_instance(username: str, session: SessionDep):
-    profile = session.exec(select(Profile).where(Profile.username == username)).first()
+    profile:UserProfilePublic = session.exec(select(Profile).where(Profile.username == username)).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
-    return profile
+    return BaseResponse(success=True,message="User profile fetched successfully",data=profile)
 
 
 async def create_connection_instance(
@@ -623,16 +633,20 @@ async def unfollow_user_instance(
     """
     Domain layer service for unfollowing user.
     """
-
-    following: Connections = session.exec(
-        select(Connections).where(
-            Connections.follower == current_user.username,
-            Connections.following == username,
-            Connections.status == 1,
+    try:
+        following: Connections = session.exec(
+            select(Connections).where(
+                Connections.follower == current_user.username,
+                Connections.following == username,
+                Connections.status == 1,
+            )
+        ).first()
+    except Exception as e:
+        raise HTTPException(
+            status_code=404, detail="Not following to this user."
         )
-    ).first()
-    if not following:
-        raise HTTPException(status_code=404, detail="Not following to this user.")
+    # if not following:
+    #     raise HTTPException(status_code=404, detail="Not following to this user.")
     following.status = 0
     session.commit()
     session.refresh(following)

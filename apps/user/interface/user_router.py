@@ -19,6 +19,7 @@ from apps.user.application.schemas import (
     Token,
     UserCreateModel,
     UserPublicModel,
+    BaseResponse
 )
 from apps.user.dependency import ConnectionResponse
 from datetime import datetime, timedelta, timezone
@@ -66,7 +67,7 @@ router = APIRouter()
 stripe.api_key = STRIPE_SECRET_API_KEY
 
 
-@router.post("/register", response_model=UserPublicModel, tags=["Users"])
+@router.post("/register", response_model=BaseResponse[UserPublicModel], tags=["Users"])
 async def register(user: UserCreateModel, session: SessionDep):
     """
     Function to create user based on the allowed roles
@@ -74,7 +75,7 @@ async def register(user: UserCreateModel, session: SessionDep):
     return await register_user(user, session)
 
 
-@router.post("/token", status_code=status.HTTP_201_CREATED, tags=["Users"])
+@router.post("/token", status_code=status.HTTP_201_CREATED, tags=["Users"], response_model= BaseResponse[Token])
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()], session: SessionDep
 ) -> Token:
@@ -94,7 +95,8 @@ async def login_for_access_token(
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
-    return Token(access_token=access_token, token_type="bearer")
+    token_data = Token(access_token=access_token, token_type="bearer")
+    return BaseResponse(data=token_data,message="Token data returned successfully!",success=True)
 
 
 @router.get("/github/login", tags=["Users"])
@@ -144,7 +146,7 @@ async def create_profile(
     )
 
 
-@router.get("/profiles/{username}/", response_model=UserProfilePublic, tags=["Profile"])
+@router.get("/profiles/{username}/", response_model= BaseResponse[UserProfilePublic], tags=["Profile"])
 async def get_profile(username: str, session: SessionDep):
     return await user_profile_get_application(username, session)
 

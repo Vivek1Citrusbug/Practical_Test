@@ -1,11 +1,17 @@
+from datetime import timedelta
+from fastapi import UploadFile
 from httpx import patch
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel, create_engine, Session
+from apps.user.domain.service import create_access_token,get_current_user
+from config import ACCESS_TOKEN_EXPIRE_MINUTES
 from main import app  # Import your FastAPI app
 from database import get_session
 from unittest.mock import AsyncMock, MagicMock
+from apps.user.application.schemas import Token
+from database import SessionDep
 
 TEST_SQLITE_URL = "sqlite:///./test_blogpost_database.db"
 test_engine = create_engine(TEST_SQLITE_URL, connect_args={"check_same_thread": False})
@@ -83,8 +89,10 @@ def invalid_user_data_weak_password():
     }
 
 
-# Mock dependencies
-mock_session = MagicMock()
+@pytest.fixture
+def mock_session():
+    return MagicMock(SessionDep)
+
 mock_user = {
     "id": 1,
     "username": "testuser",
@@ -109,21 +117,39 @@ def mock_get_current_user():
         "username": "testuser",
         "firstname": "testuserfirstname",
         "lastname": "testuserlastname",
-        "is_superuser": True,
-        "is_staff": True,
+        "is_superuser": 1,
+        "is_staff": 1,
         "email": "testuser@example.com",
         "password": "13November200@",
         "password_reset_token": "$2b$12$DpW5KsltB0SO39qlB8ERJu8ytF3FHWxtOQ2.EEqbBNp0Iba.S.h4G",
-        "is_verified": True,
+        "is_verified": 1,
         "created_at": "2025-01-27 05:45:40.139548+00:00",
         "modified_at": "2025-01-27 05:45:40.139548+00:00",
-        "is_active": True,
+        "is_active": 1,
     }
+
+@pytest.fixture(autouse=True)
+def override_dependency(mock_get_current_user):
+    app.dependency_overrides[get_current_user] = lambda: mock_get_current_user
+
 
 @pytest.fixture(scope="module")
 def mock_user_profile_data():
     return {
         "bio": "This is a test bio",
-        "is_private_account": False,
+        "is_private_account": True,
     }
 
+@pytest.fixture
+def valid_jwt_token(mock_get_current_user):
+    """Generate a JWT token using the app's actual token creation function."""
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(data={"sub": mock_get_current_user['username']}, expires_delta=access_token_expires)
+    return Token(access_token=access_token, token_type="bearer")
+
+@pytest.fixture
+def mock_upload_files():
+    return [MagicMock(spec=UploadFile)]
+
+    
+    
