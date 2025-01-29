@@ -231,7 +231,8 @@ async def github_callback_instance(code: str, session: SessionDep):
     jwt_token = create_access_token(
         {"username": user_data["login"], "sub": user_data["id"]}
     )
-    return {"jwt_token": jwt_token, "user": user_data}
+    result = {"jwt_token": jwt_token, "user": user_data}
+    return BaseResponse(success=True,data=result,message="Data returned by github!")
 
 
 def mail_service(to_email: str, reset_link: str, session: SessionDep):
@@ -278,7 +279,7 @@ async def password_reset_instance(session: SessionDep, user: str):
     reset_link = RESET_LINK + token
 
     if mail_service(current_user.email, reset_link, session):
-        return {"message": "Password reset email sent"}
+        return BaseResponse(success=True,data=None,message="Password reset email sent")
     else:
         raise HTTPException(status_code=500, detail="Error sending email")
 
@@ -306,7 +307,7 @@ async def password_reset_confirm_instance(
     session.add(current_user)
     session.commit()
     current_user.modified_at = datetime.now(timezone.utc)
-    return {"message": "Password has been reset successfully"}
+    return BaseResponse(success=True,data=None,message="Password has been reset successfully")
 
 
 async def user_profile_delete_instance(
@@ -389,7 +390,7 @@ async def user_profile_update_instance(
     session.add(profile)
     session.commit()
     session.refresh(profile)
-    return profile
+    return BaseResponse(success=True,data=profile,message="Profile updated successfully!")
 
 
 async def user_profile_create_instance(
@@ -466,11 +467,11 @@ async def user_profile_create_instance(
     session.add(new_profile)
     session.commit()
     session.refresh(new_profile)
-    return new_profile
+    return BaseResponse(success=True,data=new_profile,message="Profile created successfully!")
 
 
 async def user_profile_get_instance(username: str, session: SessionDep):
-    profile:UserProfilePublic = session.exec(select(Profile).where(Profile.username == username)).first()
+    profile = session.exec(select(Profile).where(Profile.username == username)).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     return BaseResponse(success=True,message="User profile fetched successfully",data=profile)
@@ -515,33 +516,23 @@ async def create_connection_instance(
         session.add(new_connection_request)
         session.commit()
         session.refresh(new_connection_request)
-        return {
-            "message": (
-                "Connection request sent" if status == 2 else "Connection created"
-            )
-        }
+        return BaseResponse(success=True,data=None,message="Connection request sent" if status == 2 else "Connection created")
 
     if connection_instance.status == 0:
         connection_instance.status = 2 if profile.is_private_account else 1
         session.commit()
         session.refresh(connection_instance)
         connection_instance.modified_at = datetime.now(timezone.utc)
-        return {
-            "message": (
-                "Connection request sent"
-                if profile.is_private_account
-                else f"{current_user.username} is now following {username}"
-            )
-        }
+        return BaseResponse(success=True,data=None,message="Connection request sent" if profile.is_private_account else f"{current_user.username} is now following {username}")
 
     if connection_instance.status == 2:
         connection_instance.status = 0
         session.commit()
         session.refresh(connection_instance)
         connection_instance.modified_at = datetime.now(timezone.utc)
-        return {"message": "Connection request withdrawn"}
+        return BaseResponse(success=True,data=None,message="Connection request withdrawn")
 
-    return {"message": "User is already connected or followed"}
+    return BaseResponse(success=True,data=None,message="User is already connected or followed")
 
 
 async def get_connection_requests_instance(session: SessionDep, current_user: Users):
@@ -555,8 +546,8 @@ async def get_connection_requests_instance(session: SessionDep, current_user: Us
         )
     ).all()
     if len(connection_requests) == 0:
-        return {"message": "no requests"}
-    return [myrequest.follower for myrequest in connection_requests]
+        return BaseResponse(success=True,data=[],message="no requests")
+    return BaseResponse(success=True,data=[myrequest.follower for myrequest in connection_requests],message="Your connection requests")
 
 
 async def handle_connection_requests_instance(
@@ -578,21 +569,20 @@ async def handle_connection_requests_instance(
         raise HTTPException(status_code=404, detail="Connection request not found")
     else:
         if response.value == "accept":
-            print("Request accepted")
             connection_requests.status = 1
             session.commit()
             session.refresh(connection_requests)
             connection_requests.modified_at = datetime.now(timezone.utc)
-            return {"message": "request accepted"}
+            return BaseResponse(success=True,data=None,message="Connection request accepted")
         elif response.value == "reject":
-            print("Request rejected")
             connection_requests.status = 0
             session.commit()
             session.refresh(connection_requests)
             connection_requests.modified_at = datetime.now(timezone.utc)
-            return {"message": "request rejected"}
+            return BaseResponse(success=True,data=None,message="Connection request rejected")
         else:
-            return {"message": "Invalid response"}
+            return BaseResponse(success=False,data=None,message="Invalid response")
+
 
 
 async def get_followers_instance(session: SessionDep, current_user: Users):
@@ -607,8 +597,9 @@ async def get_followers_instance(session: SessionDep, current_user: Users):
     ).all()
     print(connection_requests)
     if not connection_requests:
-        return {"message": "No followers"}
-    return [request.follower for request in connection_requests]
+        return BaseResponse(success=True,data=[],message="no followers")
+    return BaseResponse(success=True,data=[request.follower for request in connection_requests],message="Your followers!")
+    
 
 
 async def get_following_instance(session: SessionDep, current_user: Users):
@@ -623,8 +614,9 @@ async def get_following_instance(session: SessionDep, current_user: Users):
     ).all()
     print(connection_requests)
     if not connection_requests:
-        return {"message": "No followings"}
-    return [request.following for request in connection_requests]
+        return BaseResponse(success=True,data=[],message="no followings")
+    
+    return BaseResponse(success=True,data=[request.following for request in connection_requests],message="Your followings!")
 
 
 async def unfollow_user_instance(
@@ -633,25 +625,23 @@ async def unfollow_user_instance(
     """
     Domain layer service for unfollowing user.
     """
-    try:
-        following: Connections = session.exec(
-            select(Connections).where(
-                Connections.follower == current_user.username,
-                Connections.following == username,
-                Connections.status == 1,
-            )
-        ).first()
-    except Exception as e:
-        raise HTTPException(
-            status_code=404, detail="Not following to this user."
+    print("inside instance method")
+    following: Connections = session.exec(
+        select(Connections).where(
+            Connections.follower == current_user.username,
+            Connections.following == username,
+            Connections.status == 1,
         )
-    # if not following:
-    #     raise HTTPException(status_code=404, detail="Not following to this user.")
+    ).first()
+   
+    if not following:
+        raise HTTPException(status_code=404, detail="Not following to this user.")  
+      
     following.status = 0
     session.commit()
     session.refresh(following)
     following.modified_at = datetime.now(timezone.utc)
-    return {"message": f"You unfollowed {username}"}
+    return BaseResponse(success=True,data=None,message=f"You unfollowed {username}")
 
 
 async def remove_follower_instance(
@@ -677,8 +667,8 @@ async def remove_follower_instance(
     session.delete(result)
     session.commit()
     result.modified_at = datetime.now(timezone.utc)
-    return {"message": f"You removed {username}"}
-
+    return BaseResponse(success=True,data=None,message=f"You removed {username}")
+    
 
 async def create_default_superuser():
     with Session(engine) as session:
@@ -771,7 +761,7 @@ async def create_checkout_session_instance(amount: int, session: SessionDep):
             + "/after-checkout?session_id={CHECKOUT_SESSION_ID}",
         )
         print(session)
-        return {"checkout_url": session.url}
+        return BaseResponse(success=True,data=session.url,message="Your checkout url!")
 
     except Exception as e:
         raise HTTPException(
@@ -877,7 +867,7 @@ async def stripe_webhook_instance(request: Request, db_session: SessionDep):
     payload = await request.body()
     sig_header = request.headers.get("Stripe-Signature")
     endpoint_secret = STRIPE_ENDPOINT_SECRET_KEY
-
+    
     try:
         event = stripe.Webhook.construct_event(
             payload=payload, sig_header=sig_header, secret=endpoint_secret

@@ -11,7 +11,7 @@ from apps.user.domain.models import Users, Connections, Profile
 from apps.posts.dependency import upload_to_minio
 from apps.user.dependency import remove_object_from_minio
 from config import MINIO_POST_FILE_BUCKET
-
+from apps.user.application.schemas import BaseResponse
 
 def get_followers(session: SessionDep, current_user: Users):
 
@@ -61,8 +61,7 @@ def create_post_instance(
         session.add(post)
         session.commit()
         session.refresh(post)
-
-        return post
+        return BaseResponse(success=True,data=post,message="Post created successfully!")
 
     except Exception as e:
         session.rollback()
@@ -103,8 +102,9 @@ def list_posts_instance(
             query = query.where(Posts.post_by.in_(followings))
 
     query = query.offset(skip).limit(limit)
-
-    return session.exec(query).all()
+    result = session.exec(query).all()
+    
+    return BaseResponse(success=True,data=result,message="Post returned successfully")
 
 
 def list_recommended_posts_instance(session: SessionDep, current_user: Users):
@@ -156,7 +156,8 @@ def update_post_instance(
     post.file_url = file_url if file_url else post.file_url
     session.commit()
     post.modified_at = datetime.now(timezone.utc)
-    return post
+
+    return BaseResponse(success=True,data=post,message="Post updated successfully!")
 
 
 def delete_post_instance(
@@ -182,7 +183,7 @@ def delete_post_instance(
     session.commit()
 
     remove_post_cloud_data(post)
-    return {"detail": "Post deleted"}
+    return BaseResponse(success=True,data=post,message="Post delete successfully")
 
 
 def remove_post_cloud_data(post: Posts):
@@ -242,7 +243,8 @@ def report_post_instance(
     session.add(reporting_post)
     session.commit()
     session.refresh(reporting_post)
-    return reporting_post
+
+    return BaseResponse(success=True, data=reporting_post, message="Post reported successfully!")
 
 
 def create_comment_instance(
@@ -282,7 +284,7 @@ def create_comment_instance(
     session.add(comment)
     session.commit()
     session.refresh(comment)
-    return comment
+    return BaseResponse(success=True,data=comment,message="Comment posted successfully!")
 
 
 def list_comments_instance(
@@ -316,9 +318,9 @@ def list_comments_instance(
         comments = session.exec(query).all()
 
     if not comments:
-        return []
+        return BaseResponse(success=True,data=[],message="No comment to show")
 
-    return comments
+    return BaseResponse(success=True,data=comments,message="Comments on this post")
 
 
 def update_comment_instance(
@@ -365,7 +367,8 @@ def update_comment_instance(
     comment.modified_at = datetime.now(UTC)
 
     session.commit()
-    return comment
+
+    return BaseResponse(success=True,data=comment,message="Comment updated successfully!")
 
 
 def delete_comment_instance(
@@ -413,7 +416,8 @@ def delete_comment_instance(
         )
     session.delete(comment)
     session.commit()
-    return {"message": "Comment deleted successfully"}
+
+    return BaseResponse(success=True,data=comment,message="Comment deleted successfully")
 
 
 def create_like_instance(
@@ -450,9 +454,9 @@ def create_like_instance(
     if existing_like:
         session.delete(existing_like)
         session.commit()
-        return {"message": "Post unliked"}
+        return BaseResponse(success=True,data=None,message="Post unliked")
     else:
         like = Likes(post=post_id, liked_by=current_user.username)
         session.add(like)
         session.commit()
-        return {"message": "Post liked"}
+        return BaseResponse(success=True,data=None,message="Post liked")

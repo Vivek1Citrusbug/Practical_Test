@@ -75,7 +75,7 @@ async def register(user: UserCreateModel, session: SessionDep):
     return await register_user(user, session)
 
 
-@router.post("/token", status_code=status.HTTP_201_CREATED, tags=["Users"], response_model= BaseResponse[Token])
+@router.post("/token", status_code=status.HTTP_201_CREATED, tags=["Users"])
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()], session: SessionDep
 ) -> Token:
@@ -96,7 +96,7 @@ async def login_for_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
     token_data = Token(access_token=access_token, token_type="bearer")
-    return BaseResponse(data=token_data,message="Token data returned successfully!",success=True)
+    return token_data
 
 
 @router.get("/github/login", tags=["Users"])
@@ -106,7 +106,8 @@ def github_login():
         f"?client_id={GITHUB_CLIENT_ID}"
         f"&scope=read:user,user:email"
     )
-    return {"auth_url": github_auth_url}
+    result = {"auth_url": github_auth_url}
+    return BaseResponse(success=True,data=result,message="Please authorize using provided url!")  
 
 
 @router.get("/github/callback", tags=["Users"])
@@ -132,7 +133,7 @@ async def password_reset_confirm(
     return await password_reset_confirm_application(new_password, session, username)
 
 
-@router.post("/profiles/", response_model=UserProfilePublic, tags=["Profile"])
+@router.post("/profiles/", response_model=BaseResponse[UserProfilePublic], tags=["Profile"])
 async def create_profile(
     session: SessionDep,
     file: Optional[list[UploadFile]] = File(None),
@@ -151,7 +152,7 @@ async def get_profile(username: str, session: SessionDep):
     return await user_profile_get_application(username, session)
 
 
-@router.put("/profiles/{username}/", response_model=UserProfilePublic, tags=["Profile"])
+@router.put("/profiles/{username}/", response_model=BaseResponse[UserProfilePublic], tags=["Profile"])
 async def update_profile(
     session: SessionDep,
     bio: str | None = Form(...),
@@ -183,7 +184,7 @@ async def create_follow_request(
     return await create_connection_application(username, session, current_user)
 
 
-@router.post("/connection/unfollow/", tags=["Connections"])
+@router.put("/connection/unfollow/", tags=["Connections"])
 async def unfollow_user(
     username: str,
     session: SessionDep,

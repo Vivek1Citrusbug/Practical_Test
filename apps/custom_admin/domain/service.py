@@ -5,7 +5,7 @@ from apps.user.domain.models import Users
 from apps.posts.domain.models import Posts
 from fastapi import HTTPException, status
 from apps.custom_admin.dependency import send_post_removal_email
-
+from apps.user.application.schemas import BaseResponse
 
 def get_reported_post_instance(session: SessionDep, current_user: Users):
     """
@@ -21,8 +21,7 @@ def get_reported_post_instance(session: SessionDep, current_user: Users):
             if post_id not in result:
                 result[post_id] = []
             result[post_id].append(reported_by)
-        # returning dictionary having post id as key and list of user who reported that post as value
-        return result
+        return BaseResponse(success=True,data=result,message="Post reported by different users!")
     else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -54,7 +53,7 @@ def delete_post_instance(post_id: int, session: SessionDep, current_user: Users)
             deleting_post.title,
             removal_reason="Your post has been removed as it does not comply with our company's content policy.",
         )   
-        return {"detail": "Post deleted successfully."}
+        return BaseResponse(success=True,data=deleting_post,message="Post deleted successfully.")
     else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

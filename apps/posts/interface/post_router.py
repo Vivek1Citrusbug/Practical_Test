@@ -2,6 +2,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile, Form, Depends, API
 from sqlmodel import Session, select
 from typing import List, Optional
 from database import engine, SessionDep
+from apps.user.application.schemas import BaseResponse
 from apps.posts.domain.models import Posts, ReportedPosts, Comments, Likes
 from apps.user.domain.service import get_current_user
 from apps.user.domain.models import Users
@@ -27,7 +28,7 @@ from apps.posts.application.service import (
 
 router = APIRouter()
 
-@router.post("/", response_model=PostPublicModel)
+@router.post("/", response_model=BaseResponse[PostPublicModel])
 def create_post(
     session: SessionDep,
     title: str,
@@ -39,7 +40,7 @@ def create_post(
     return create_post_application(session, title, content,current_user, file)
 
 
-@router.get("/", response_model=List[PostPublicModel])
+@router.get("/", response_model=BaseResponse[List[PostPublicModel]])
 def list_posts(
     session: SessionDep,
     current_user: Users = Depends(get_current_user),
@@ -50,7 +51,7 @@ def list_posts(
     return list_posts_application(session,current_user, skip, limit, username)
 
 
-@router.put("/{post_id}/", response_model=PostPublicModel)
+@router.put("/{post_id}/", response_model=BaseResponse[PostPublicModel])
 def update_post(
     post_id: int,
     session: SessionDep,
@@ -71,7 +72,7 @@ def delete_post(
     return delete_post_application(post_id, session, current_user)
 
 
-@router.post("/{post_id}/report/", response_model=ReportPublicModel)
+@router.post("/{post_id}/report/", response_model=BaseResponse[ReportPublicModel])
 def report_post(
     post_id: int,
     session: SessionDep,
@@ -80,7 +81,7 @@ def report_post(
     return report_post_application(post_id, session, current_user)
 
 
-@router.post("/{post_id}/comments/create/", response_model=CommentPublicModel)
+@router.post("/{post_id}/comments/create/", response_model=BaseResponse[CommentPublicModel])
 def post_comment(
     post_id: int,
     content,
@@ -90,7 +91,7 @@ def post_comment(
     return create_comment_application(post_id, content, session, current_user)
 
 
-@router.get("/{post_id}/comments", response_model=list[CommentPublicModel])
+@router.get("/{post_id}/comments", response_model=BaseResponse[list[CommentPublicModel]])
 def get_comment(
     post_id: int,
     session: SessionDep,
@@ -99,7 +100,7 @@ def get_comment(
     return list_comments_application(post_id, session, current_user)
 
 
-@router.put("/{post_id}/comments/{comment_id}/", response_model=CommentUpdateModel)
+@router.put("/{post_id}/comments/{comment_id}/", response_model=BaseResponse[CommentUpdateModel])
 def comment_update(
     post_id,
     content,
