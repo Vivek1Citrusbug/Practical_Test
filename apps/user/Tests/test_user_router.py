@@ -106,3 +106,5 @@ def test_create_profile_success(mock_get_current_user, mock_user_profile_data,cl
     assert "is_private_account" in data
     assert data["is_private_account"] == mock_user_profile_data["is_private_account"]
 
+    
+
