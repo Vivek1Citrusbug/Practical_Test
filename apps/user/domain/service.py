@@ -455,10 +455,11 @@ async def user_profile_create_instance(
                     status_code=500,
                     detail=f"An unexpected error occurred while processing {file.filename}: {str(generic_error)}",
                 )
-
+    print(file_urls)
+    profile_picture_str = ','.join(file_urls)
     new_profile = Profile(
         bio=bio,
-        profile_picture=json.dumps(file_urls),
+        profile_picture=profile_picture_str,
         is_private_account=is_private_account,
         username=current_user.username,
     )
