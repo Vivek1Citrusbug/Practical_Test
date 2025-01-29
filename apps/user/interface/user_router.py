@@ -115,7 +115,6 @@ async def github_callback(code: str, session: SessionDep):
 @router.post("/password-reset/{username}/", tags=["Users"])
 async def password_reset_request(
     session: SessionDep,
-    # current_user: Users = Depends(get_current_user),
     username: str,
 ):
     return await password_reset_application(session, username)
@@ -126,7 +125,6 @@ async def password_reset_confirm(
     new_password: str,
     session: SessionDep,
     username: str,
-    # current_user: Users = Depends(get_current_user),
 ):
 
     return await password_reset_confirm_application(new_password, session, username)
@@ -156,7 +154,7 @@ async def update_profile(
     session: SessionDep,
     bio: str | None = Form(...),
     is_private_account: bool | None = Form(...),
-    file: Optional[list[UploadFile]] | None= File(None),
+    file: Optional[list[UploadFile]] | None = File(None),
     current_user: Users = Depends(get_current_user),
 ):
     return await user_profile_update_application(

@@ -1,26 +1,24 @@
+from httpx import patch
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
-from main import app
-from database import base, get_db
+from sqlmodel import SQLModel, create_engine, Session
+from main import app  # Import your FastAPI app
+from database import get_session
+from unittest.mock import AsyncMock, MagicMock
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+TEST_SQLITE_URL = "sqlite:///./test_blogpost_database.db"
+test_engine = create_engine(TEST_SQLITE_URL, connect_args={"check_same_thread": False})
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 
 @pytest.fixture()
 def session():
-
-    base.metadata.drop_all(bind=engine)
-    base.metadata.create_all(bind=engine)
+    SQLModel.metadata.drop_all(bind=test_engine)
+    SQLModel.metadata.create_all(bind=test_engine)
 
     db = TestingSessionLocal()
-
     try:
         yield db
     finally:
@@ -29,14 +27,103 @@ def session():
 
 @pytest.fixture()
 def client(session):
+    def override_get_session():
+        with session as db_session:
+            yield db_session
 
-    def override_get_db():
-        try:
-
-            yield session
-        finally:
-            session.close()
-
-    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_session] = override_get_session
 
     yield TestClient(app)
+
+
+@pytest.fixture
+def valid_user_data():
+    return {
+        "username": "viveksoniii",
+        "name": "viveksoni",
+        "first_name": "vivesonoi",
+        "last_name": "strsdsdving",
+        "email": "user@example.com",
+        "password": "13November200@",
+    }
+
+
+@pytest.fixture
+def invalid_user_data_missing_username():
+    return {
+        "name": "viveksoni",
+        "first_name": "vivek",
+        "last_name": "soni",
+        "email": "viveksoni@example.com",
+        "password": "13November200@",
+    }
+
+
+@pytest.fixture
+def invalid_user_data_invalid_email():
+    return {
+        "username": "viveksoniii",
+        "name": "viveksoni",
+        "first_name": "vivek",
+        "last_name": "soni",
+        "email": "invalid-email-format",
+        "password": "13November200@",
+    }
+
+
+@pytest.fixture
+def invalid_user_data_weak_password():
+    return {
+        "username": "viveksoniii",
+        "name": "viveksoni",
+        "first_name": "vivek",
+        "last_name": "soni",
+        "email": "viveksoni@example.com",
+        "password": "12345",
+    }
+
+
+# Mock dependencies
+mock_session = MagicMock()
+mock_user = {
+    "id": 1,
+    "username": "testuser",
+    "firstname": "testuserfirstname",
+    "lastname": "testuserlastname",
+    "is_superuser": True,
+    "is_staff": True,
+    "email": "testuser@example.com",
+    "password": "13November200@",
+    "password_reset_token": "$2b$12$DpW5KsltB0SO39qlB8ERJu8ytF3FHWxtOQ2.EEqbBNp0Iba.S.h4G",
+    "is_verified": True,
+    "created_at": "2025-01-27 05:45:40.139548+00:00",
+    "modified_at": "2025-01-27 05:45:40.139548+00:00",
+    "is_active": True,
+}
+
+
+@pytest.fixture(scope="module")
+def mock_get_current_user():
+    return {
+        "id": 1,
+        "username": "testuser",
+        "firstname": "testuserfirstname",
+        "lastname": "testuserlastname",
+        "is_superuser": True,
+        "is_staff": True,
+        "email": "testuser@example.com",
+        "password": "13November200@",
+        "password_reset_token": "$2b$12$DpW5KsltB0SO39qlB8ERJu8ytF3FHWxtOQ2.EEqbBNp0Iba.S.h4G",
+        "is_verified": True,
+        "created_at": "2025-01-27 05:45:40.139548+00:00",
+        "modified_at": "2025-01-27 05:45:40.139548+00:00",
+        "is_active": True,
+    }
+
+@pytest.fixture(scope="module")
+def mock_user_profile_data():
+    return {
+        "bio": "This is a test bio",
+        "is_private_account": False,
+    }
+

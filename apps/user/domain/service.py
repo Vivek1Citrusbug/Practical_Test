@@ -456,7 +456,6 @@ async def user_profile_create_instance(
     session.add(new_profile)
     session.commit()
     session.refresh(new_profile)
-    # schedule_recommendation_email(current_user)
     return new_profile
 
 
