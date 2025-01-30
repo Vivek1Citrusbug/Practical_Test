@@ -2,8 +2,7 @@ from io import BytesIO
 from fastapi import HTTPException
 import pytest
 from unittest.mock import MagicMock, patch
-
-from apps.user.application.schemas import UserProfilePublic
+from apps.user.application.schemas import BaseResponse, UserProfilePublic
 
 
 def test_register_user(client, valid_user_data):
@@ -73,6 +72,47 @@ def test_password_reset_request(mock_password_reset_application, client):
     )
     assert response.status_code == 200
     assert response.json() == {"message": "Password reset email sent"}
+
+
+@patch("apps.user.application.service.password_reset_instance")
+def test_password_reset_request_user_not_found(mock_password_reset_instance, client):
+    mock_password_reset_instance.side_effect = HTTPException(
+        status_code=404, detail="User not found"
+    )
+    response = client.post(
+        "/auth/password-reset/testuser/",
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["message"] == "User not found"
+
+
+@patch("apps.user.application.service.password_reset_confirm_instance")
+def test_password_reset_confirm_success(mock_password_reset_confirm_instance, client):
+    mock_password_reset_confirm_instance.return_value = BaseResponse(
+        success=True, data=None, message="Password has been reset successfully"
+    )
+    response = client.post(
+        "/auth/password-reset/confirm/testuser/",
+        params={"username": "tesetuser", "new_password": "25jan800@#"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] == True
+    assert data["message"] == "Password has been reset successfully"
+
+
+@patch("apps.user.application.service.password_reset_confirm_instance")
+def test_password_reset_confirm_failuer(mock_password_reset_confirm_instance, client):
+    mock_password_reset_confirm_instance.side_effect = HTTPException(
+        status_code=404, detail="User not found"
+    )
+    response = client.post(
+        "/auth/password-reset/confirm/random_user/",
+        params={"username": "random_user", "new_password": "25jan800@#"},
+    )
+    assert response.status_code == 404
+    data = response.json()
+    assert data["error"]["message"] == "User not found"
 
 
 @patch("apps.user.interface.user_router.user_profile_create_application")
@@ -252,3 +292,262 @@ def test_user_profile_delete_invalid_token(
     assert response.status_code == 401
     data = response.json()
     assert data["error"]["message"] == "Could not validate credentials"
+
+
+@patch("apps.user.application.service.create_connection_instance")
+def test_create_connection_success(
+    mock_create_connection_instance, valid_jwt_token, client
+):
+    mock_create_connection_instance.return_value = BaseResponse(
+        success=True, data=None, message="Connection request sent"
+    )
+
+    response = client.post("/auth/connection/testfriend/", headers=valid_jwt_token)
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Connection request sent"
+    assert response.json()["success"] is True
+
+
+@patch("apps.user.application.service.create_connection_instance")
+def test_create_connection_self_request(
+    mock_create_connection_instance, valid_jwt_token, client
+):
+    mock_create_connection_instance.side_effect = HTTPException(
+        status_code=400, detail="User can not send request to themselves"
+    )
+
+    response = client.post("/auth/connection/testuser/", headers=valid_jwt_token)
+
+    assert response.status_code == 400
+    assert (
+        response.json()["error"]["message"] == "User can not send request to themselves"
+    )
+
+
+@patch("apps.user.application.service.create_connection_instance")
+def test_create_connection_user_not_found(
+    mock_create_connection_instance, valid_jwt_token, client
+):
+    mock_create_connection_instance.side_effect = HTTPException(
+        status_code=404, detail="User not found."
+    )
+
+    response = client.post("/auth/connection/nonexistentuser/", headers=valid_jwt_token)
+    assert response.status_code == 404
+    assert response.json()["error"]["message"] == "User not found."
+
+
+@patch("apps.user.application.service.create_connection_instance")
+def test_create_connection_profile_not_found(
+    mock_create_connection_instance, valid_jwt_token, client
+):
+    mock_create_connection_instance.side_effect = HTTPException(
+        status_code=404, detail="Profile not found for the given user."
+    )
+
+    response = client.post(
+        "/auth/connection/userwithoutprofile/", headers=valid_jwt_token
+    )
+    assert response.status_code == 404
+    assert (
+        response.json()["error"]["message"] == "Profile not found for the given user."
+    )
+
+
+@patch("apps.user.application.service.unfollow_user_instance")
+def test_unfollow_success(mock_unfollow_user_instance, valid_jwt_token, client):
+    """Test successful unfollowing of a user"""
+
+    mock_unfollow_user_instance.return_value = {
+        "success": True,
+        "data": None,
+        "message": "You unfollowed testfriend",
+    }
+
+    response = client.put(
+        "/auth/connection/unfollow/",
+        headers=valid_jwt_token,
+        params={"username": "testfriend"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["message"] == "You unfollowed testfriend"
+
+
+@patch("apps.user.application.service.unfollow_user_instance")
+def test_unfollow_not_following(mock_unfollow_user_instance, valid_jwt_token, client):
+    """Test trying to unfollow a user who is not followed"""
+
+    mock_unfollow_user_instance.side_effect = HTTPException(
+        status_code=404, detail="Not following to this user."
+    )
+
+    response = client.put(
+        "/auth/connection/unfollow/",
+        headers=valid_jwt_token,
+        params={"username": "testfriend"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["message"] == "Not following to this user."
+
+
+@patch("apps.user.application.service.get_connection_requests_instance")
+def test_get_connection_requests_success(mock_get_connection_requests_instance, client):
+    mock_get_connection_requests_instance.return_value = {
+        "success": True,
+        "data": [
+            "testuser1",
+            "testuser2",
+        ],
+        "message": "Your connection requests",
+    }
+    response = client.get("/auth/connection/requests/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] == True
+    assert data["data"] == ["testuser1", "testuser2"]
+
+
+@patch("apps.user.application.service.get_connection_requests_instance")
+def test_get_connection_requests_no_request(
+    mock_get_connection_requests_instance, client
+):
+    mock_get_connection_requests_instance.return_value = {
+        "success": True,
+        "data": [],
+        "message": "no requests",
+    }
+    response = client.get("/auth/connection/requests/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] == True
+    assert data["data"] == []
+
+
+@patch("apps.user.application.service.handle_connection_requests_instance")
+def test_handle_requests_accept(mock_handle_connection_requests_instance, client):
+    mock_handle_connection_requests_instance.return_value = BaseResponse(
+        success=True, data=None, message="Connection request accepted"
+    )
+    response = client.post(
+        "/auth/connection/request/status",
+        params={"username": "testuser1", "response": "accept"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] == True
+    assert data["data"] == None
+    assert data["message"] == "Connection request accepted"
+
+
+@patch("apps.user.application.service.handle_connection_requests_instance")
+def test_handle_requests_reject(mock_handle_connection_requests_instance, client):
+    mock_handle_connection_requests_instance.return_value = BaseResponse(
+        success=True, data=None, message="Connection request rejected"
+    )
+    response = client.post(
+        "/auth/connection/request/status",
+        params={"username": "testuser1", "response": "reject"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] == True
+    assert data["data"] == None
+    assert data["message"] == "Connection request rejected"
+
+
+@patch("apps.user.application.service.handle_connection_requests_instance")
+def test_handle_requests_no_request(mock_handle_connection_requests_instance, client):
+    mock_handle_connection_requests_instance.side_effect = HTTPException(
+        status_code=404, detail="Connection request not found"
+    )
+    response = client.post(
+        "/auth/connection/request/status",
+        params={"username": "random_user", "response": "reject"},
+    )
+    assert response.status_code == 404
+    data = response.json()
+    assert data["error"]["message"] == "Connection request not found"
+
+
+@patch("apps.user.application.service.get_followers_instance")
+def test_get_followers_no_followers(mock_get_followers_instance, client):
+    mock_get_followers_instance.return_value = BaseResponse(
+        success=True, data=[], message="no followers"
+    )
+    response = client.get(
+        "/auth/followers/",
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] == True
+    assert data["message"] == "no followers"
+
+
+@patch("apps.user.application.service.get_followers_instance")
+def test_get_followers_list_followers(mock_get_followers_instance, client):
+    mock_get_followers_instance.return_value = BaseResponse(
+        success=True, data=["testuser1", "testuser2"], message="Your followers!"
+    )
+    response = client.get(
+        "/auth/followers/",
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] == True
+    assert data["message"] == "Your followers!"
+
+
+@patch("apps.user.application.service.remove_follower_instance")
+def test_remove_follower_success(mock_remove_follower_instance, client):
+    mock_remove_follower_instance.return_value = BaseResponse(
+        success=True, data=None, message=f"You removed testuser1"
+    )
+    response = client.delete(
+        "/auth/connection/remove_follower/", params={"username": "testuser1"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] == True
+    assert data["message"] == "You removed testuser1"
+
+
+@patch("apps.user.application.service.remove_follower_instance")
+def test_remove_follower_not_found(mock_remove_follower_instance, client):
+    mock_remove_follower_instance.side_effect = HTTPException(
+        status_code=404, detail="Follower not found"
+    )
+    response = client.delete(
+        "/auth/connection/remove_follower/", params={"username": "random_user"}
+    )
+    assert response.status_code == 404
+    data = response.json()
+    assert data["error"]["message"] == "Follower not found"
+
+
+@patch("apps.user.application.service.create_checkout_session_instance")
+def test_create_checkout_success(mock_create_checkout_session_instance, client):
+    mock_create_checkout_session_instance.return_value = BaseResponse(success=True,data="session.url",message="Your checkout url!")
+    response = client.post(
+        "/auth/create-checkout-session/", params={"amount": 500}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] == True
+
+
+@patch("apps.user.application.service.create_checkout_session_instance")
+def test_create_checkout_failure(mock_create_checkout_session_instance, client):
+    mock_create_checkout_session_instance.side_effect = HTTPException(status_code=400, detail="Amount must be $5")
+    response = client.post(
+        "/auth/create-checkout-session/", params={"amount": 400}
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert data["error"]["message"] == "Amount must be $5"
+    
+
+

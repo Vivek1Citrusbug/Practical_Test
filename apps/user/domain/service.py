@@ -599,7 +599,7 @@ async def get_followers_instance(session: SessionDep, current_user: Users):
             Connections.following == current_user.username, Connections.status == 1
         )
     ).all()
-    print(connection_requests)
+
     if not connection_requests:
         return BaseResponse(success=True,data=[],message="no followers")
     return BaseResponse(success=True,data=[request.follower for request in connection_requests],message="Your followers!")
@@ -616,7 +616,7 @@ async def get_following_instance(session: SessionDep, current_user: Users):
             Connections.follower == current_user.username, Connections.status == 1
         )
     ).all()
-    print(connection_requests)
+    
     if not connection_requests:
         return BaseResponse(success=True,data=[],message="no followings")
     
