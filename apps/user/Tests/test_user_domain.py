@@ -46,6 +46,7 @@ async def test_user_profile_delete_not_found():
 @pytest.mark.asyncio
 async def test_user_profile_delete_unauthorized():
     """Test unauthorized profile deletion"""
+    
     session = MagicMock()
     profile = Profile(username="testuser")
     session.exec.return_value.first.return_value = profile
@@ -56,22 +57,6 @@ async def test_user_profile_delete_unauthorized():
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "You are not authorized to perform this task"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 @pytest.mark.asyncio

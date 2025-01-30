@@ -168,9 +168,7 @@ async def test_user_profile_get_application(
         message="User profile fetched successfully",
         data=valid_profile_data,
     )
-    result = await user_profile_get_application(
-        valid_profile_data["username"], session
-    )
+    result = await user_profile_get_application(valid_profile_data["username"], session)
     mock_user_profile_get_instance.assert_called_once_with(
         valid_profile_data["username"], session
     )
@@ -418,6 +416,7 @@ async def test_remove_follower_application(
     assert result.success == True
     assert result.message == f"You removed {username}"
 
+
 @pytest.mark.asyncio
 @patch("apps.user.application.service.create_checkout_session_instance")
 def test_create_checkout_failure(mock_create_checkout_session_instance, client):
@@ -428,5 +427,3 @@ def test_create_checkout_failure(mock_create_checkout_session_instance, client):
     assert response.status_code == 400
     data = response.json()
     assert data["error"]["message"] == "Amount must be $5"
-
-
