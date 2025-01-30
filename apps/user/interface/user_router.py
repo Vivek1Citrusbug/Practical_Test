@@ -165,13 +165,13 @@ async def update_profile(
     )
 
 
-@router.delete("/profiles/{username}", tags=["Profile"])
+@router.delete("/profiles/{username}", tags=["Profile"],response_model=BaseResponse[UserProfilePublic])
 async def delete_profile(
     username: str,
     session: SessionDep,
     current_user: Users = Depends(get_current_user),
 ):
-
+    
     return await user_profile_delete_application(username, session, current_user)
 
 

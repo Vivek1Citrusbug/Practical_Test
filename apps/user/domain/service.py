@@ -330,7 +330,10 @@ async def user_profile_delete_instance(
         session.delete(profile)
         session.commit()
         await remove_profile_data(profile)
-        return {"detail": "Profile deleted successfully"}
+        return BaseResponse(success=True,data=profile,message="Profile deleted successfully")
+    else:
+        raise HTTPException(status_code=401, detail="You are not authorized to perform this task")
+       
 
 
 async def user_profile_update_instance(

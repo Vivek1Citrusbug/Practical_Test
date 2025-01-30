@@ -1,12 +1,13 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from fastapi import UploadFile
 from httpx import patch
+import jwt
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel, create_engine, Session
 from apps.user.domain.service import create_access_token,get_current_user
-from config import ACCESS_TOKEN_EXPIRE_MINUTES
+from config import ACCESS_TOKEN_EXPIRE_MINUTES, ALGORITHM, SECRET_KEY
 from main import app  # Import your FastAPI app
 from database import get_session
 from unittest.mock import AsyncMock, MagicMock
@@ -145,6 +146,16 @@ def valid_jwt_token(mock_get_current_user):
     """Generate a JWT token using the app's actual token creation function."""
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(data={"sub": mock_get_current_user['username']}, expires_delta=access_token_expires)
+    return Token(access_token=access_token, token_type="bearer")
+
+
+@pytest.fixture
+def invalid_jwt_token():
+    """Generate an expired JWT token."""
+    expired_time = datetime.now(UTC) - timedelta(minutes=10)  
+    access_token = jwt.encode(
+        {"sub": "random_user", "exp": expired_time}, SECRET_KEY, algorithm=ALGORITHM
+    )
     return Token(access_token=access_token, token_type="bearer")
 
 @pytest.fixture
