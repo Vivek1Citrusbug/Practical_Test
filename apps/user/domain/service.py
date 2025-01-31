@@ -378,9 +378,9 @@ async def user_profile_update_instance(
                 file_bytes, str(uuid.uuid4()) + "." + file_extension
             )
             file_urls.append(file_url)
-
+    
     if len(file_urls):
-        profile.profile_picture = json.dumps(file_urls)
+        profile.profile_picture =  ','.join(file_urls)
 
     profile.is_private_account = (
         is_private_account
@@ -416,7 +416,7 @@ async def user_profile_create_instance(
     if existing_profile:
         raise HTTPException(status_code=400, detail="User already has a profile")
 
-    allowed_extensions = {"jpg", "jpeg", "png", "gif", "mp4", "mkv", "avi", "mov"}
+    allowed_extensions = ["jpg", "jpeg", "png", "gif", "mp4", "mkv", "avi", "mov"]
 
     file_urls = []
 
@@ -458,7 +458,7 @@ async def user_profile_create_instance(
                     status_code=500,
                     detail=f"An unexpected error occurred while processing {file.filename}: {str(generic_error)}",
                 )
-    print(file_urls)
+    
     profile_picture_str = ','.join(file_urls)
     new_profile = Profile(
         bio=bio,
@@ -467,7 +467,7 @@ async def user_profile_create_instance(
         username=current_user.username,
     )
 
-    print(new_profile)
+   
     session.add(new_profile)
     session.commit()
     session.refresh(new_profile)
@@ -888,3 +888,5 @@ async def stripe_webhook_instance(request: Request, db_session: SessionDep):
     else:
         print(f"Unhandled event type: {event['type']}")
     return {"status": "success"}
+
+
