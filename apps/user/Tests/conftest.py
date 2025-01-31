@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
-from fastapi import UploadFile
+from typing import Annotated
+from fastapi import Depends, UploadFile
 from httpx import patch
 import jwt
 import pytest
@@ -20,30 +21,56 @@ test_engine = create_engine(TEST_SQLITE_URL, connect_args={"check_same_thread": 
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
+# @pytest.fixture()
+# def session():
+#     SQLModel.metadata.drop_all(bind=test_engine)
+#     SQLModel.metadata.create_all(bind=test_engine)
+
+#     db = TestingSessionLocal()
+#     try:
+#         yield db
+#         db.commit()
+#     finally:
+#         db.close()
+
+
+# @pytest.fixture()
+# def client(session):
+#     def override_get_session():
+#         with Session(test_engine) as db_session:
+#             yield db_session
+
+#     app.dependency_overrides[get_session] = override_get_session
+#     app.dependency_overrides[SessionDep] = override_get_session
+#     yield TestClient(app)
 
 @pytest.fixture()
 def session():
-    SQLModel.metadata.drop_all(bind=test_engine)
-    SQLModel.metadata.create_all(bind=test_engine)
-
+    """Fixture to create a test database session and rollback after each test."""
+    SQLModel.metadata.drop_all(bind=test_engine)  
+    SQLModel.metadata.create_all(bind=test_engine) 
+    
     db = TestingSessionLocal()
     try:
-        yield db
+        yield db  
         db.commit()
     finally:
+        db.rollback()  
         db.close()
-
 
 @pytest.fixture()
 def client(session):
-    def override_get_session():
-        with session as db_session:
-            yield db_session
+    """Fixture to override FastAPI dependencies and provide a test client."""
 
+    def override_get_session():
+        yield session  
+
+    # Override dependencies
     app.dependency_overrides[get_session] = override_get_session
+    app.dependency_overrides[SessionDep] = override_get_session  
 
     yield TestClient(app)
-
+    app.dependency_overrides.clear()
 
 @pytest.fixture
 def valid_user_data():
@@ -108,7 +135,7 @@ def invalid_user_data_weak_password():
 
 @pytest.fixture
 def mock_session():
-    """Creates a mocked session that does not interact with a real database"""
+    """Mocked session that does not interact with a real database"""
     session = MagicMock()
     session.exec = MagicMock()
     session.delete = MagicMock()

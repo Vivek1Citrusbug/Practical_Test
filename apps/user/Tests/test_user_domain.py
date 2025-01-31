@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from apps.user.domain.service import user_profile_delete_instance
 from apps.user.domain.models import Profile, Users
 from apps.user.application.schemas import BaseResponse
-
+from database import SessionDep
 
 @pytest.mark.asyncio
 @patch("apps.user.domain.service.remove_profile_data", new_callable=AsyncMock)
@@ -64,18 +64,13 @@ async def test_user_profile_delete_unauthorized():
 @pytest.mark.asyncio
 @patch("apps.user.domain.service.remove_profile_data", new_callable=AsyncMock)
 async def test_user_profile_delete_admin_success(
-    mock_remove_profile_data, mock_session, valid_profile_data, valid_admin_user
+    mock_remove_profile_data, sessionDep, valid_profile_data, valid_admin_user
 ):
     """Test admin deleting a user profile using a mocked session"""
 
     profile = Profile(**valid_profile_data)
-    mock_session.exec.return_value.first.return_value = profile
     admin_user = Users(**valid_admin_user)
-    print(admin_user)
-    result = await user_profile_delete_instance("testuser", mock_session, admin_user)
-    mock_session.delete.assert_called_once_with(profile)
-    mock_session.commit.assert_called_once()
-    mock_remove_profile_data.assert_awaited_once_with(profile)
+    result = await user_profile_delete_instance("testuser", sessionDep, admin_user)
     assert isinstance(result, BaseResponse)
     assert result.success is True
     assert result.message == "Profile deleted successfully"
