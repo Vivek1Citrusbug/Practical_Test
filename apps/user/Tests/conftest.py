@@ -1,5 +1,7 @@
 from datetime import UTC, datetime, timedelta
-from fastapi import UploadFile
+from io import BytesIO
+from typing import Annotated
+from fastapi import Depends, UploadFile
 from httpx import patch
 import jwt
 import pytest
@@ -20,30 +22,66 @@ test_engine = create_engine(TEST_SQLITE_URL, connect_args={"check_same_thread": 
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
+# @pytest.fixture()
+# def session():
+#     SQLModel.metadata.drop_all(bind=test_engine)
+#     SQLModel.metadata.create_all(bind=test_engine)
+
+#     db = TestingSessionLocal()
+#     try:
+#         yield db
+#         db.commit()
+#     finally:
+#         db.close()
+
+
+# @pytest.fixture()
+# def client(session):
+#     def override_get_session():
+#         with Session(test_engine) as db_session:
+#             yield db_session
+
+#     app.dependency_overrides[get_session] = override_get_session
+#     app.dependency_overrides[SessionDep] = override_get_session
+#     yield TestClient(app)
 
 @pytest.fixture()
 def session():
-    SQLModel.metadata.drop_all(bind=test_engine)
-    SQLModel.metadata.create_all(bind=test_engine)
-
+    """Fixture to create a test database session and rollback after each test."""
+    SQLModel.metadata.drop_all(bind=test_engine)  
+    SQLModel.metadata.create_all(bind=test_engine) 
+    
     db = TestingSessionLocal()
     try:
-        yield db
+        yield db  
         db.commit()
     finally:
+        db.rollback()  
         db.close()
-
 
 @pytest.fixture()
 def client(session):
+    """Fixture to override FastAPI dependencies and provide a test client."""
+
     def override_get_session():
-        with session as db_session:
-            yield db_session
+        yield session  
 
     app.dependency_overrides[get_session] = override_get_session
+    app.dependency_overrides[SessionDep] = override_get_session  
 
     yield TestClient(app)
+    app.dependency_overrides.clear()
 
+@pytest.fixture(scope="function")
+def db_session():
+    """Create a test database session with SQLModel compatibility"""
+    engine = create_engine(TEST_SQLITE_URL, connect_args={"check_same_thread": False})
+    SQLModel.metadata.drop_all(engine)
+    SQLModel.metadata.create_all(engine)  
+    with Session(engine) as session:
+        yield session  
+        session.rollback()
+        session.close() 
 
 @pytest.fixture
 def valid_user_data():
@@ -70,6 +108,47 @@ def valid_profile_data():
         "username": "testuser",
     }
 
+
+@pytest.fixture
+def valid_normal_profile_data_1():
+    return {
+        "id": 2,
+        "bio": "test bio",
+        "profile_picture": "test_image.jpg",
+        "is_private_account": True,
+        "created_at": "2025-01-27 05:45:40.139548+00:00",
+        "modified_at": "2025-01-27 05:45:40.139548+00:00",
+        "is_active": True,
+        "username": "normaluser1",
+    }
+
+
+@pytest.fixture
+def valid_normal_profile_data_2():
+    return {
+        "id": 3,
+        "bio": "test bio",
+        "profile_picture": "test_image.jpg",
+        "is_private_account": True,
+        "created_at": "2025-01-27 05:45:40.139548+00:00",
+        "modified_at": "2025-01-27 05:45:40.139548+00:00",
+        "is_active": True,
+        "username": "normaluser2",
+    }
+
+
+@pytest.fixture
+def valid_normal_profile_data_3():
+    return {
+        "id": 10,
+        "bio": "test bio",
+        "profile_picture": "test_image.jpg",
+        "is_private_account": False,
+        "created_at": "2025-01-27 05:45:40.139548+00:00",
+        "modified_at": "2025-01-27 05:45:40.139548+00:00",
+        "is_active": True,
+        "username": "normaluser3",
+    }
 
 @pytest.fixture
 def invalid_user_data_missing_username():
@@ -108,7 +187,7 @@ def invalid_user_data_weak_password():
 
 @pytest.fixture
 def mock_session():
-    """Creates a mocked session that does not interact with a real database"""
+    """Mocked session that does not interact with a real database"""
     session = MagicMock()
     session.exec = MagicMock()
     session.delete = MagicMock()
@@ -138,8 +217,9 @@ def valid_admin_user():
     return {
         "id": 2,
         "username": "testadmin",
-        "firstname": "testadminfirstname",
-        "lastname": "testadminlastname",
+        "name": "testadmin",
+        "firs_tname": "testadminfirstname",
+        "last_name": "testadminlastname",
         "is_superuser": True,
         "is_staff": True,
         "email": "testadmin@example.com",
@@ -152,13 +232,72 @@ def valid_admin_user():
     }
 
 
+@pytest.fixture
+def valid_normal_user_1():
+    return {
+        "id": 3,
+        "username": "normaluser1",
+        "name":"normaluser1",
+        "first_name": "testnormaluserfirstname",
+        "last_name": "testnormaluserlastname",
+        "is_superuser": False,
+        "is_staff": False,
+        "email": "testnormaluser@example.com",
+        "password": "13November200@",
+        "password_reset_token": "$2b$12$DpW5KsltB0SO39qlB8ERJu8ytF3FHWxtOQ2.EEqbBNp0Iba.S.h4G",
+        "is_verified": False,
+        "created_at": "2025-01-27 05:45:40.139548+00:00",
+        "modified_at": "2025-01-27 05:45:40.139548+00:00",
+        "is_active": False,
+    }
+
+
+@pytest.fixture
+def valid_normal_user_3():
+    return {
+        "id": 10,
+        "username": "normaluser3",
+        "name":"normaluser3",
+        "first_name": "testnormaluserfirstname",
+        "last_name": "testnormaluserlastname",
+        "is_superuser": False,
+        "is_staff": False,
+        "email": "testnormaluser3@example.com",
+        "password": "13November200@",
+        "password_reset_token": "$2b$12$DpW5KsltB0SO39qlB8ERJu8ytF3FHWxtOQ2.EEqbBNp0Iba.S.h4G",
+        "is_verified": False,
+        "created_at": "2025-01-27 05:45:40.139548+00:00",
+        "modified_at": "2025-01-27 05:45:40.139548+00:00",
+        "is_active": False,
+    }
+
+@pytest.fixture
+def valid_normal_user_2():
+    return {
+        "id": 4,
+        "username": "normaluser2",
+        "name": "normaluser2",
+        "firs_tname": "testnormaluserfirstname2",
+        "last_name": "testnormaluserlastname2",
+        "is_superuser": False,
+        "is_staff": False,
+        "email": "testnormaluser2@example.com",
+        "password": "13November200@",
+        "password_reset_token": "$2b$12$DpW5KsltB0SO39qlB8ERJu8ytF3FHWxtOQ2.EEqbBNp0Iba.S.h4G",
+        "is_verified": False,
+        "created_at": "2025-01-27 05:45:40.139548+00:00",
+        "modified_at": "2025-01-27 05:45:40.139548+00:00",
+        "is_active": False,
+    }
+
 @pytest.fixture(scope="module")
 def mock_get_current_user():
     return {
-        "id": 1,
+        "id": 10,
         "username": "testuser",
-        "firstname": "testuserfirstname",
-        "lastname": "testuserlastname",
+        "name": "testuser",
+        "firs_tname": "testuserfirstname",
+        "last_name": "testuserlastname",
         "is_superuser": 1,
         "is_staff": 1,
         "email": "testuser@example.com",
@@ -222,3 +361,14 @@ def mock_connection_request(session):
     session.add(connection)
     session.commit()
     return connection
+
+@pytest.fixture
+def mock_file():
+    file = UploadFile(filename="test_image.jpg", file=BytesIO(b"fake_image_data"))
+    return file
+
+
+@pytest.fixture
+def mock_file_unsupported():
+    file = UploadFile(filename="test_image.jiff", file=BytesIO(b"fake_image_data"))
+    return file
