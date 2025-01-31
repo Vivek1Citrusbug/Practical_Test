@@ -330,7 +330,10 @@ async def user_profile_delete_instance(
         session.delete(profile)
         session.commit()
         await remove_profile_data(profile)
-        return {"detail": "Profile deleted successfully"}
+        return BaseResponse(success=True,data=profile,message="Profile deleted successfully")
+    else:
+        raise HTTPException(status_code=401, detail="You are not authorized to perform this task")
+       
 
 
 async def user_profile_update_instance(
@@ -596,7 +599,7 @@ async def get_followers_instance(session: SessionDep, current_user: Users):
             Connections.following == current_user.username, Connections.status == 1
         )
     ).all()
-    print(connection_requests)
+
     if not connection_requests:
         return BaseResponse(success=True,data=[],message="no followers")
     return BaseResponse(success=True,data=[request.follower for request in connection_requests],message="Your followers!")
@@ -613,7 +616,7 @@ async def get_following_instance(session: SessionDep, current_user: Users):
             Connections.follower == current_user.username, Connections.status == 1
         )
     ).all()
-    print(connection_requests)
+    
     if not connection_requests:
         return BaseResponse(success=True,data=[],message="no followings")
     
