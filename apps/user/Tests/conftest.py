@@ -59,7 +59,7 @@ def session():
         db.rollback()  
         db.close()
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def client(session):
     """Fixture to override FastAPI dependencies and provide a test client."""
 
@@ -72,7 +72,7 @@ def client(session):
     yield TestClient(app)
     app.dependency_overrides.clear()
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 def db_session():
     """Create a test database session with SQLModel compatibility"""
     engine = create_engine(TEST_SQLITE_URL, connect_args={"check_same_thread": False})
