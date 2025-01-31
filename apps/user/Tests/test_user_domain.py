@@ -46,11 +46,13 @@ async def test_user_profile_delete_not_found():
 @pytest.mark.asyncio
 async def test_user_profile_delete_unauthorized():
     """Test unauthorized profile deletion"""
-    
+
     session = MagicMock()
     profile = Profile(username="testuser")
     session.exec.return_value.first.return_value = profile
-    user = Users(username="anotheruser", is_staff=False, is_superuser=False)  # Unauthorized user
+    user = Users(
+        username="anotheruser", is_staff=False, is_superuser=False
+    )  # Unauthorized user
 
     with pytest.raises(HTTPException) as exc_info:
         await user_profile_delete_instance("testuser", session, user)
@@ -61,7 +63,9 @@ async def test_user_profile_delete_unauthorized():
 
 @pytest.mark.asyncio
 @patch("apps.user.domain.service.remove_profile_data", new_callable=AsyncMock)
-async def test_user_profile_delete_admin_success(mock_remove_profile_data, mock_session,valid_profile_data,valid_admin_user):
+async def test_user_profile_delete_admin_success(
+    mock_remove_profile_data, mock_session, valid_profile_data, valid_admin_user
+):
     """Test admin deleting a user profile using a mocked session"""
 
     profile = Profile(**valid_profile_data)
@@ -69,9 +73,9 @@ async def test_user_profile_delete_admin_success(mock_remove_profile_data, mock_
     admin_user = Users(**valid_admin_user)
     print(admin_user)
     result = await user_profile_delete_instance("testuser", mock_session, admin_user)
-    mock_session.delete.assert_called_once_with(profile) 
-    mock_session.commit.assert_called_once()  
-    mock_remove_profile_data.assert_awaited_once_with(profile)  
+    mock_session.delete.assert_called_once_with(profile)
+    mock_session.commit.assert_called_once()
+    mock_remove_profile_data.assert_awaited_once_with(profile)
     assert isinstance(result, BaseResponse)
     assert result.success is True
     assert result.message == "Profile deleted successfully"
