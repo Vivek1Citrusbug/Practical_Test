@@ -119,10 +119,10 @@ async def test_user_profile_delete_application(
         success=True, data=mock_get_current_user, message="Profile deleted successfully"
     )
     result = await user_profile_delete_application(
-        mock_get_current_user["username"], session, mock_get_current_user
+        mock_get_current_user.username, session, mock_get_current_user
     )
     mock_user_profile_delete_instance.assert_called_once_with(
-        mock_get_current_user["username"], session, mock_get_current_user
+        mock_get_current_user.username, session, mock_get_current_user
     )
     assert result.message == "Profile deleted successfully"
 
@@ -223,7 +223,7 @@ async def test_create_connection_application_success_connection(
     mock_create_connection_instance.return_value = BaseResponse(
         success=True,
         data=None,
-        message=f"{mock_get_current_user["username"]} is now following {username}",
+        message=f"{mock_get_current_user.username} is now following {username}",
     )
     result = await create_connection_application(
         username, session, mock_get_current_user
@@ -234,7 +234,7 @@ async def test_create_connection_application_success_connection(
     assert result.success == True
     assert (
         result.message
-        == f"{mock_get_current_user["username"]} is now following {username}"
+        == f"{mock_get_current_user.username} is now following {username}"
     )
 
 

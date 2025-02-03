@@ -101,6 +101,12 @@ def list_posts_instance(
         if not current_user.is_verified:
             query = query.where(Posts.post_by.in_(followings))
 
+    if skip < 0:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Enter valid skip")
+    elif limit < 0:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Enter valid limit")
+    
+    
     query = query.offset(skip).limit(limit)
     result = session.exec(query).all()
     
