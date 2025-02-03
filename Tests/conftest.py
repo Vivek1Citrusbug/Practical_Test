@@ -45,7 +45,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 #     app.dependency_overrides[SessionDep] = override_get_session
 #     yield TestClient(app)
 
-@pytest.fixture()
+@pytest.fixture(scope="function")
 def session():
     """Fixture to create a test database session and rollback after each test."""
     SQLModel.metadata.drop_all(bind=test_engine)  
@@ -59,7 +59,7 @@ def session():
         db.rollback()  
         db.close()
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def client(session):
     """Fixture to override FastAPI dependencies and provide a test client."""
 
@@ -72,7 +72,7 @@ def client(session):
     yield TestClient(app)
     app.dependency_overrides.clear()
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def db_session():
     """Create a test database session with SQLModel compatibility"""
     engine = create_engine(TEST_SQLITE_URL, connect_args={"check_same_thread": False})

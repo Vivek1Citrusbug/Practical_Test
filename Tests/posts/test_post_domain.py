@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 from apps.posts.domain.models import Posts
-from apps.user.Tests.conftest import *
+# from Tests.conftest import *
 from apps.posts.domain.service import create_comment_instance, create_post_instance, delete_post_instance, get_followers, list_comments_instance, list_posts_instance, report_post_instance, update_post_instance
 
 
